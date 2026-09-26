@@ -10,7 +10,10 @@ const AUTHORIZE = 'https://claude.ai/oauth/authorize'
 const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token'
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
 const PROFILE_URL = 'https://api.anthropic.com/api/oauth/profile'
-const SCOPE = 'org:create_api_key user:profile user:inference'
+// Read-only: usage and profile need nothing more. The upstream app also asked
+// for `user:inference` and `org:create_api_key`, which would let this token
+// spend the subscription or mint API keys.
+const SCOPE = 'user:profile'
 const UA = 'claude-cli/2.1.181 (external, cli)'
 // when CLAUDE_CONFIG_DIR is set (e.g. via direnv for multi-account setups),
 // keep the widget's data alongside that account's Claude config

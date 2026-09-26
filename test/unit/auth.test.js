@@ -64,6 +64,13 @@ describe('authorize URL', () => {
     expect(q.get('state')).toMatch(/^[A-Za-z0-9_-]+$/)
   })
 
+  test('asks for the read-only profile scope and nothing that can spend or mint keys', () => {
+    const scopes = new URL(auth.begin()).searchParams.get('scope').split(' ')
+    expect(scopes).toEqual(['user:profile'])
+    expect(scopes).not.toContain('user:inference')
+    expect(scopes).not.toContain('org:create_api_key')
+  })
+
   test('is different every time', () => {
     const a = new URL(auth.begin()).searchParams
     const b = new URL(auth.begin()).searchParams
