@@ -250,16 +250,13 @@ body.collapsed #flames {
 body.collapsed.state-stressed #compact-flames {
   display: block;
 }
-/* In the single-provider ring, flames overlap only the top of the head. */
-body.collapsed.state-stressed:not(.dual) #compact-flames {
+/* In the ring, flames overlap only the top of the head. */
+body.collapsed.state-stressed #compact-flames {
   z-index: 3;
   height: 40px;
 }
-body.collapsed.state-stressed:not(.dual) #pet {
+body.collapsed.state-stressed #pet {
   transform: translateY(-5px);
-}
-body.collapsed.dual.state-stressed #compact-flames {
-  top: -30px;
 }
 body.collapsed.state-stressed .compact-flame {
   transform-box: fill-box;

@@ -25,26 +25,18 @@
       },
     }
   }
-  // Activity freshness is separate from quota freshness: Codex can work while
-  // its last rate-limit reading is old. Ignore abandoned activity snapshots.
+  // Activity freshness is separate from quota freshness. Ignore abandoned
+  // activity snapshots.
   const FRESH_MS = 60000
-  const SLEEP_MS = 300000 // main's default sleepThresholdMs; Codex and Cursor have no flag of their own
-  // each source is its last payload, or null while it isn't connected
-  function currentActivity({ claude = null, codex = null, cursor = null } = {}, now = Date.now()) {
+  // `claude` is its last payload, or null while it isn't connected
+  function currentActivity({ claude = null } = {}, now = Date.now()) {
     const fresh = (at) => Number.isFinite(at) && now - at <= FRESH_MS
-    const providers = []
-    if (claude?.active && fresh(claude.ts)) providers.push('claude')
-    if (codex?.active && fresh(codex.lastSeen)) providers.push('codex')
-    if (cursor?.active && fresh(cursor.lastSeen)) providers.push('cursor')
-    // Claude's and Cursor's logs say *what* they're doing; Codex's don't, and
-    // two workers share one scene
-    const solo = providers.length === 1 ? { claude, cursor }[providers[0]] : null
-    const activity = solo?.activity || 'working'
-    const idle = (s) => s && !!s.lastSeen && now - s.lastSeen >= SLEEP_MS
-    const asleep = [claude && !!claude.sleeping, idle(codex), idle(cursor)].filter(
-      (v) => v !== null && v !== undefined,
-    )
-    return { providers, activity, sleeping: asleep.length > 0 && asleep.every(Boolean) }
+    const working = !!claude?.active && fresh(claude.ts)
+    return {
+      providers: working ? ['claude'] : [],
+      activity: (working && claude.activity) || 'working',
+      sleeping: !!claude?.sleeping,
+    }
   }
   const api = { createActivityTracker, currentActivity }
   if (typeof module === 'object' && module.exports) module.exports = api

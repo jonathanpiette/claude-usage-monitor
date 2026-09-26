@@ -1105,7 +1105,7 @@ body:not(.live) #bymodel {
   border: 1px solid rgba(206, 146, 109, 0.22);
   border-radius: 7px;
   background: rgba(206, 146, 109, 0.055);
-  /* the same breathing room the meters get, so it never touches the tabs
+  /* the same breathing room the meters get, so it never touches the meters
      above it or the Details rule below */
   margin: 12px 0;
   padding: 12px 13px;
@@ -1243,16 +1243,16 @@ body.collapsed #card {
   width: 144px;
   padding: 12px 12px 13px;
 }
-/* one service: three buttons plus the account need a title band of their
-   own, like the dual dock has, or they sit on the ring's arc */
-body.collapsed:not(.dual):not(.pet-only) #card {
+/* three buttons plus the account need a title band of their own, or they
+   sit on the ring's arc */
+body.collapsed:not(.pet-only) #card {
   width: 168px;
   padding-top: 32px;
 }
-body.collapsed:not(.dual):not(.pet-only) #stage {
+body.collapsed:not(.pet-only) #stage {
   margin-top: 0;
 }
-body.collapsed:not(.dual):not(.pet-only) #mini-acct-name {
+body.collapsed:not(.pet-only) #mini-acct-name {
   max-width: 46px;
 }
 body.collapsed #stage {
@@ -2275,114 +2275,6 @@ body.state-tired #status-text {
   }
 }
 
-#harness-tabs {
-  display: none;
-  gap: 6px;
-  min-width: 0;
-  margin: 10px 0 0;
-  -webkit-app-region: no-drag;
-}
-body.dual #harness-tabs {
-  display: flex;
-}
-#harness-tabs button {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  min-height: 26px;
-  padding: 4px 7px;
-  border: 1px solid #ffffff12;
-  border-radius: 6px;
-  background: #ffffff03;
-  color: var(--muted);
-  font: inherit;
-  font-size: 11px;
-  cursor: pointer;
-}
-#harness-tabs button[aria-selected="true"] {
-  color: var(--text);
-  border-color: #dc997351;
-  background: #d977571c;
-  box-shadow: inset 0 1px 0 #ffffff05;
-}
-#harness-tabs #tab-codex[aria-selected="true"] {
-  border-color: #a7baa14d;
-  background: #a7baa11c;
-}
-#harness-tabs #tab-cursor[aria-selected="true"] {
-  border-color: #a9b8d64d;
-  background: #a9b8d61c;
-}
-#harness-tabs button[hidden] {
-  display: none;
-}
-/* three services: logo and % only; the name stays for screen readers */
-body.trio #harness-tabs button {
-  justify-content: center;
-  gap: 6px;
-}
-body.trio #harness-tabs button > span:not(.tab-value):not(.tab-alert) {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-body.trio #harness-tabs .tab-value {
-  margin-left: 0;
-}
-#harness-tabs button:hover {
-  border-color: #ffffff2b;
-  color: var(--text);
-}
-#harness-tabs .tab-logo {
-  width: 12px;
-  height: 12px;
-  flex: none;
-  fill: currentColor;
-  opacity: 0.65;
-}
-#harness-tabs button[aria-selected="true"] .tab-logo {
-  opacity: 1;
-}
-/* brand colours, as in Settings; a working service lights up fully */
-#tab-claude .tab-logo {
-  color: #e4a17c;
-}
-#tab-codex .tab-logo {
-  color: #b9c8b0;
-}
-#tab-cursor .tab-logo {
-  color: #b8c4dc;
-}
-#harness-tabs button.active .tab-logo {
-  opacity: 1;
-}
-#harness-tabs .tab-value {
-  margin-left: auto;
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-}
-#harness-tabs button.urgent .tab-value,
-#harness-tabs .tab-alert {
-  color: #f3a38b;
-}
-#harness-tabs .tab-alert[hidden] {
-  display: none;
-}
-#mini-reset {
-  margin-top: 6px;
-  color: #b4a18a;
-  font-size: 9px;
-  line-height: 1.4;
-}
-#mini-reset[hidden] {
-  display: none;
-}
-
 /* the session % is the headline number */
 #limits-meters > .meter:first-child {
   margin-top: 8px;
@@ -2404,153 +2296,6 @@ body.trio #harness-tabs .tab-value {
   color: #a6b39c;
 }
 
-/* the Codex view: logs, not a live feed — and its own tint */
-body.view-codex #live-tag {
-  display: none;
-}
-body.view-codex #session-fill,
-body.view-codex #week-fill {
-  background: #a7baa1;
-}
-body.view-codex #session-fill.mid,
-body.view-codex #week-fill.mid {
-  background: #e5b55d;
-}
-body.view-codex #session-fill.hot,
-body.view-codex #week-fill.hot {
-  background: #ee705e;
-}
-body.view-codex .mrow .mbar > i {
-  background: #a7baa1;
-}
-body.view-codex .sq.lv1 {
-  background: #3a503b;
-}
-body.view-codex .sq.lv2 {
-  background: #5b7655;
-}
-body.view-codex .sq.lv3 {
-  background: #8d9f72;
-}
-body.view-codex .sq.lv4 {
-  background: #c2c994;
-}
-
-/* the Cursor view: a monthly budget, read from its dashboard — steel blue */
-body.view-cursor #live-tag,
-body.view-cursor #session-proj,
-body.view-cursor #details-toggle,
-body.view-cursor #usage-details {
-  display: none;
-}
-body.view-cursor #session-fill,
-body.view-cursor #week-fill {
-  background: #9fb2d6;
-}
-body.view-cursor #session-fill.mid,
-body.view-cursor #week-fill.mid {
-  background: #e5b55d;
-}
-body.view-cursor #session-fill.hot,
-body.view-cursor #week-fill.hot {
-  background: #ee705e;
-}
-
-/* collapsed with both: one line per service instead of the ring, never an average */
-#mini-dual {
-  display: none;
-}
-body.collapsed.dual #card {
-  width: 216px;
-  padding: 32px 12px 12px;
-  display: grid;
-  grid-template-columns: 66px minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  border-radius: 16px;
-}
-body.collapsed.dual #stage {
-  height: 70px;
-  width: 66px;
-  margin: 0;
-  background: radial-gradient(ellipse at center, #d9775710, transparent 70%);
-}
-body.collapsed.dual #pet {
-  zoom: 0.7;
-  transform: translateY(-2px);
-}
-body.collapsed.dual #shadow {
-  top: calc(50% + 22px);
-  width: 35px;
-}
-body.collapsed.dual #ring,
-body.collapsed.dual #ring-pct {
-  display: none;
-}
-body.collapsed.dual #mini {
-  min-width: 0;
-  margin: 0;
-}
-body.collapsed.dual #mini-acct-name {
-  max-width: 112px;
-  font-size: 10px;
-}
-
-/* The mood sits beneath the pet, level with the selected source reset. */
-body.collapsed.dual .mini-line {
-  position: absolute;
-  bottom: 12px;
-  left: 12px;
-  width: 66px;
-  justify-content: center;
-  margin: 0;
-  gap: 5px;
-}
-body.collapsed.dual #mini-text {
-  font-size: 9px;
-  font-weight: 400;
-  color: #b9afa3;
-}
-body.collapsed.dual #mini-dot {
-  width: 4px;
-  height: 4px;
-}
-body.collapsed.dual #mini-dual {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 5px;
-}
-.mini-source {
-  --src: #e4a17c;
-  position: relative;
-  display: grid;
-  grid-template-columns: 12px minmax(0, 1fr) auto;
-  align-items: center;
-  column-gap: 5px;
-  row-gap: 4px;
-  min-width: 0;
-  min-height: 29px;
-  padding: 3px 0 3px 5px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: #aaa298;
-  text-align: left;
-  font: inherit;
-  font-size: 10px;
-  cursor: pointer;
-  -webkit-app-region: no-drag;
-  transition: color 0.15s;
-}
-.mini-source[data-provider="codex"] {
-  --src: #b9c8b0;
-}
-.mini-source[data-provider="cursor"] {
-  --src: #b8c4dc;
-}
-.mini-source[hidden] {
-  display: none;
-}
 .mini-logo {
   grid-column: 1;
   grid-row: 1;
@@ -2558,81 +2303,8 @@ body.collapsed.dual #mini-dual {
   height: 12px;
   fill: currentColor;
 }
-.mini-source-name {
-  grid-column: 2;
-  grid-row: 1;
-}
-/* Selection uses contrast; urgent readings retain their warning color. */
-.mini-source[aria-pressed="false"] .mini-track i {
-  opacity: 0.55;
-}
-.mini-source[aria-pressed="false"]:hover .mini-track i,
-.mini-source.urgent .mini-track i {
-  opacity: 1;
-}
-.mini-source[aria-pressed="true"] {
-  color: #eee4d9;
-}
-.mini-source[aria-pressed="true"] .mini-logo {
-  color: var(--src);
-}
-.mini-source:hover {
-  color: #fff4e8;
-}
-.mini-source:hover .mini-logo {
-  color: var(--src);
-}
-.mini-source b {
-  grid-column: 3;
-  grid-row: 1;
-  font-size: 15px;
-  line-height: 1.1;
-  letter-spacing: -0.4px;
-  font-weight: 500;
-  color: inherit;
-  font-variant-numeric: tabular-nums;
-}
-.mini-source.urgent b {
-  color: #f3a38b;
-}
-.mini-source.urgent .mini-source-name::after {
-  content: " !";
-  color: #f3a38b;
-}
-.mini-track {
-  grid-column: 2 / -1;
-  grid-row: 2;
-  height: 2px;
-  border-radius: 2px;
-  overflow: hidden;
-  background: #ffffff0d;
-}
-body.collapsed.dual #mini-reset {
-  text-align: right;
-  margin-top: 7px;
-  font-size: 8px;
-  color: #b4a18a;
-}
 
-.mini-track i {
-  display: block;
-  height: 100%;
-  width: 0;
-  background: #d97757;
-}
-#mini-codex-bar {
-  background: #a7baa1;
-}
-#mini-cursor-bar {
-  background: #9fb2d6;
-}
-.mini-track i.hot,
-#mini-codex-bar.hot,
-#mini-cursor-bar.hot {
-  background: #ee705e;
-}
-
-/* Settings → Connections: a row of service tiles; the open one shows its card */
+/* Settings → Connections: the Claude tile; when open, it shows its card */
 #conn-tiles {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2719,86 +2391,13 @@ body:has(#connections > .open) #conn-tiles {
   margin: 0 0 18px;
 }
 
-/* Settings → Connections: Claude and Codex share one card shape */
+/* Settings → Connections: the Claude card */
 .connections-label {
   margin-top: 18px;
   margin-bottom: 0;
 }
 #account .connect-block {
   margin: 7px 0 8px;
-}
-#codex-settings {
-  display: flex;
-  margin: 0 0 8px;
-}
-.codex-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: none;
-}
-#codex-setup:not([hidden]) {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.codex-x {
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: 0;
-  border-radius: 5px;
-  background: none;
-  color: var(--muted);
-  cursor: pointer;
-}
-.codex-x:hover {
-  color: var(--text);
-  background: #ffffff0d;
-}
-.codex-x .ic {
-  width: 12px;
-  height: 12px;
-}
-/* which pieces show: off, setting up, or on */
-#codex-disconnect,
-body.codex-on #codex-hint,
-body.codex-on #codex-connect,
-body.codex-setup #codex-connect {
-  display: none;
-}
-body.codex-on #codex-disconnect {
-  display: grid;
-}
-#cursor-settings {
-  display: flex;
-  margin: 0 0 18px;
-}
-#cursor-disconnect,
-body.cursor-on #cursor-hint,
-body.cursor-on #cursor-connect,
-body.cursor-setup #cursor-connect {
-  display: none;
-}
-body.cursor-on #cursor-disconnect {
-  display: grid;
-}
-#cursor-setup:not([hidden]) {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-body.view-cursor .ac-caret {
-  display: none;
-}
-body.view-codex .mrow .mname::before {
-  background: #a7baa1;
-}
-/* no account switcher on the Codex side: the chip opens Settings */
-body.view-codex .ac-caret {
-  display: none;
 }
 /* keyboard focus: a soft inner glow in the brand coral rather than a detached
    cream ring — still visible, but it reads as the control lighting up */
@@ -2825,21 +2424,6 @@ body.view-codex .ac-caret {
   }
 }
 
-/* the Codex view is tinted sage, even when Codex is the only service */
-body.view-codex {
-  --panel-bg:
-    radial-gradient(130% 110% at 20% 0%, #6c816830, transparent 60%),
-    linear-gradient(158deg, #242b24, #1b211c 55%, #141a15);
-  --panel-border: #b4c6ac20;
-  --settings-bg: linear-gradient(150deg, #283028, #1b211c);
-}
-body.view-cursor {
-  --panel-bg:
-    radial-gradient(130% 110% at 20% 0%, #5f6d8a30, transparent 60%),
-    linear-gradient(158deg, #23262d, #1a1d23 55%, #14161b);
-  --panel-border: #b6c2dc20;
-  --settings-bg: linear-gradient(150deg, #272b33, #1a1d23);
-}
 #details-toggle {
   display: flex;
   align-items: center;
@@ -2873,9 +2457,7 @@ body.view-cursor {
 }
 
 #acc-connected.connection-card,
-#acc-intro.connection-card,
-#codex-settings.connection-card,
-#cursor-settings.connection-card {
+#acc-intro.connection-card {
   align-items: center;
   gap: 10px;
   min-height: 64px;
@@ -2884,9 +2466,7 @@ body.view-cursor {
   border-radius: 10px;
   background: #ffffff03;
 }
-#acc-connected.connection-card,
-body.codex-on #codex-settings.connection-card,
-body.cursor-on #cursor-settings.connection-card {
+#acc-connected.connection-card {
   height: 64px;
 }
 .connection-card .connection-avatar {
@@ -2901,17 +2481,7 @@ body.cursor-on #cursor-settings.connection-card {
   background: #d9775718;
   color: #e4a17c;
 }
-.codex-avatar {
-  background: #9eaf9614;
-  color: #b9c8b0;
-}
-.cursor-avatar {
-  background: #a9b8d614;
-  color: #b8c4dc;
-}
-.connection-logo,
-.codex-logo,
-.cursor-logo {
+.connection-logo {
   fill: currentColor;
 }
 .connection-avatar svg {
@@ -2961,18 +2531,6 @@ body.cursor-on #cursor-settings.connection-card {
   font-size: 10px;
   font-weight: 400;
   line-height: 1.3;
-}
-#codex-connected-caption {
-  display: none;
-}
-body.codex-on #codex-connected-caption {
-  display: block;
-}
-#cursor-connected-caption {
-  display: none;
-}
-body.cursor-on #cursor-connected-caption {
-  display: block;
 }
 .connection-card .connection-remove {
   flex: none;
@@ -3159,15 +2717,12 @@ body.collapsed #bubble {
   grid-column: 1 / -1;
   transform-origin: 50% 100%;
 }
-/* one service: the card has no title band, so clear the window controls, and
-   hug the short line instead of spanning the whole card */
-body.collapsed:not(.dual) #bubble {
+/* the card has no title band, so clear the window controls, and hug the
+   short line instead of spanning the whole card */
+body.collapsed #bubble {
   align-self: center;
   margin-top: 26px;
   text-align: center;
-}
-body.collapsed.dual #bubble {
-  justify-self: start;
 }
 body.collapsed #bubble::before {
   left: calc(50% - 7px);
@@ -3175,14 +2730,6 @@ body.collapsed #bubble::before {
 body.collapsed #bubble::after {
   left: calc(50% - 5px);
 }
-/* with both services the pet sits in the left column: aim there */
-body.collapsed.dual #bubble::before {
-  left: 24px;
-}
-body.collapsed.dual #bubble::after {
-  left: 26px;
-}
-
 #controls button[hidden] {
   display: none;
 }
@@ -3259,9 +2806,6 @@ body.collapsed:not(.pet-only):not(.is-menubar) #controls #pet-only-toggle {
   font-size: 8px;
   min-height: 20px;
 }
-body.collapsed.dual #mini-reminder {
-  float: right;
-}
 #companion-notice {
   grid-column: 1 / -1;
   padding: 6px 8px;
@@ -3273,12 +2817,6 @@ body.collapsed.dual #mini-reminder {
   line-height: 1.4;
   text-align: center;
   -webkit-app-region: no-drag;
-}
-#companion-notice[data-provider="codex"] {
-  color: #c1d1b8;
-}
-#companion-notice[data-provider="cursor"] {
-  color: #c3cde2;
 }
 #companion-notice[hidden],
 body.settings-open #companion-notice {
@@ -3304,16 +2842,6 @@ body.collapsed.pet-only #stage {
   bottom: 38px;
   margin: 0;
   background: none;
-}
-/* three readings need a wider glance: the card grows, the pet stays centred */
-body.collapsed.pet-only.trio #card {
-  width: 188px;
-}
-body.collapsed.pet-only.trio #stage {
-  right: 43px;
-}
-body.collapsed.pet-only.trio #pet-activity:not([hidden]) {
-  right: 22px;
 }
 body.collapsed.pet-only #pet {
   zoom: 1.05;
@@ -3387,7 +2915,7 @@ body.collapsed.pet-only.pet-peek #pet-glance {
   font: inherit;
   cursor: pointer;
 }
-/* Keep provider names available to assistive technology. */
+/* Keep the service name available to assistive technology. */
 #pet-glance button > span {
   position: absolute;
   width: 1px;
@@ -3431,27 +2959,7 @@ body.collapsed.pet-only #pet:focus-visible {
     transition: none;
   }
 }
-/* A short reaction temporarily occupies the account label, so the compact
-   widget stays still instead of growing for every activity transition. */
-body.collapsed.dual:not(.pet-only) #companion-notice {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  right: 78px;
-  margin: 0;
-  padding: 0;
-  background: none;
-  font-size: 8px;
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-body.collapsed.dual:has(#companion-notice:not([hidden])) #mini-acct {
-  visibility: hidden;
-}
-
-/* Activity belongs to the pet, independently of the selected usage tab. */
+/* Activity belongs to the pet. */
 .activity-logos {
   display: inline-flex;
   align-items: center;
@@ -3460,12 +2968,6 @@ body.collapsed.dual:has(#companion-notice:not([hidden])) #mini-acct {
 }
 .activity-logos [data-provider="claude"] {
   color: #df9777;
-}
-.activity-logos [data-provider="codex"] {
-  color: #b9c8b0;
-}
-.activity-logos [data-provider="cursor"] {
-  color: #b8c4dc;
 }
 .activity-logos svg {
   display: block;
