@@ -1,10 +1,10 @@
 name: Release
 
 # Fully automated: every push to main runs semantic-release, which reads the
-# Conventional Commits and — when there's something to ship — computes the
-# version, builds the app on every platform, publishes to npm, and cuts a
-# GitHub Release with all the artifacts. No version commit is pushed back to
-# main (tag only).
+# Conventional Commits and, when there's something to ship, computes the
+# version, builds the app on every platform and cuts a GitHub Release with all
+# the artifacts. This fork never publishes to npm. No version commit is pushed
+# back to main (tag only).
 #
 # Three stages, because Windows/Linux artifacts can't be cross-built from macOS:
 #   version -> build (matrix, stamps the version) -> publish (attaches them all)
@@ -46,8 +46,6 @@ jobs:
         id: next
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -o pipefail
           bunx semantic-release --dry-run 2>&1 | tee release-dry-run.log
@@ -124,7 +122,6 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          registry-url: https://registry.npmjs.org
 
       - run: bun install --frozen-lockfile
 
@@ -138,6 +135,4 @@ jobs:
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: bunx semantic-release

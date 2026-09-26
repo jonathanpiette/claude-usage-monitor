@@ -13,21 +13,14 @@ const {
 const path = require('node:path')
 const fs = require('node:fs')
 const os = require('node:os')
-const { spawn } = require('node:child_process')
 const usage = require('./usage')
 const { getUsage } = usage
 const auth = require('./auth')
 const accounts = require('./accounts')
-const codex = require('./codex')
-const cursor = require('./cursor')
 const { createReminders } = require('./reminders')
 
-const REPO = 'renatoaug/claude-usage-monitor'
-const USAGE_URLS = {
-  claude: 'https://claude.ai/settings/usage',
-  codex: 'https://chatgpt.com/usage#settings/Usage',
-  cursor: 'https://cursor.com/dashboard?tab=usage',
-}
+const REPO = 'jonathanpiette/claude-usage-monitor'
+const USAGE_URL = 'https://claude.ai/settings/usage'
 
 // data dir: kept outside the project folder so moving the repo doesn't break it.
 // when CLAUDE_CONFIG_DIR is set (e.g. via direnv for multi-account setups), nest
@@ -64,11 +57,7 @@ let currentMode = 'floating' // 'floating' widget | 'menubar' popover
 let trayBounds = null // last known tray icon rect, to anchor the popover
 let lastBlurHide = 0 // debounce: ignore the tray click that dismissed the popover
 let sessionPct = null // authoritative session % shown in the tray title
-let codexUsage = null // last Codex payload, null while it isn't enabled
 let realUsageAt = 0
-let codexReadAt = 0
-let cursorUsage = null // last Cursor payload, null while it isn't enabled
-let cursorReadAt = 0
 let realUsage = null // last OAuth usage payload — the % alerts trust when logged in
 let lastProgrammaticMove = 0 // ignore the 'moved' event our own setPosition triggers
 let displayChanging = 0 // ignore OS window-shuffles while a display (dis)connects
@@ -84,8 +73,6 @@ function publicConfig(c) {
     alertThresholds: c.alertThresholds,
     fireThreshold: c.fireThreshold,
     zoom: c.zoom,
-    codex: !!c.codex?.enabled,
-    cursor: !!c.cursor?.enabled,
     talk: c.talk,
     sound: c.sound,
     soundMutedUntil: c.soundMutedUntil,
@@ -103,8 +90,6 @@ function loadConfig() {
     alertThresholds: [80, 95],
     fireThreshold: 90, // session % at which the pet catches fire (tired still fixed at 100)
     zoom: 100, // widget scale %, 100-200
-    codex: { enabled: false }, // opt-in from Settings, never on by finding ~/.codex
-    cursor: { enabled: false }, // opt-in too: it reads the Cursor app's own login
     talk: true, // speech bubbles on transitions
     sound: false, // chiptune blips: opt-in, audio must never surprise anyone
     soundMutedUntil: 0, // the one-click "mute for 1 hour", as an epoch ms
@@ -153,7 +138,7 @@ function fmtDuration(ms) {
 function fmtClock(ms) {
   const at = new Date(Date.now() + ms)
   const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-  // a week or more out (Cursor's monthly cycle), a weekday would be ambiguous
+  // a week or more out, a weekday would be ambiguous
   if (ms >= 6 * 86400000) return at.toLocaleDateString([], { month: 'short', day: 'numeric' })
   return ms >= 86400000 ? `${at.toLocaleDateString([], { weekday: 'short' })} ${time}` : time
 }
@@ -177,37 +162,12 @@ const resetReminders = createReminders({
     fs.renameSync(tmp, REMINDERS_FILE)
   },
 })
-// Codex and Cursor have one connection each; Claude's reminders are per account
-const reminderKey = (provider) =>
-  provider === 'claude' ? `claude:${accounts.activeId()}` : provider
-const NAMES = { claude: 'Claude', codex: 'Codex', cursor: 'Cursor' }
-// each service's reset window, when it was read, and whether it's still on
-function serviceState(provider) {
-  if (provider === 'codex')
-    return {
-      session: codexUsage?.session,
-      readAt: codexReadAt,
-      freshAt: codexUsage?.limitsAt,
-      on: !!config.codex?.enabled,
-    }
-  if (provider === 'cursor')
-    return {
-      session: cursorUsage?.session,
-      readAt: cursorReadAt,
-      freshAt: cursorUsage?.limitsAt,
-      on: !!config.cursor?.enabled,
-    }
-  return { session: realUsage?.session, readAt: realUsageAt, freshAt: realUsageAt, on: null }
-}
+// Claude is the only service; its reminders are per account
+const reminderKey = () => `claude:${accounts.activeId()}`
 function sendReminders(error = null) {
   if (!win || win.isDestroyed()) return
-  const find = (p) => resetReminders.list().find((r) => r.key === reminderKey(p)) || null
-  win.webContents.send('reminders', {
-    claude: find('claude'),
-    codex: find('codex'),
-    cursor: find('cursor'),
-    error,
-  })
+  const claude = resetReminders.list().find((r) => r.key === reminderKey()) || null
+  win.webContents.send('reminders', { claude, error })
 }
 function cancelReminder(key) {
   try {
@@ -223,17 +183,15 @@ function cancelReminder(key) {
 function checkResetReminders() {
   try {
     for (const r of resetReminders.list()) {
-      const connected =
-        r.provider === 'claude'
-          ? accounts.list().some((a) => r.key === `claude:${a.id}` && hasToken(a.id))
-          : serviceState(r.provider).on
+      const connected = accounts.list().some((a) => r.key === `claude:${a.id}` && hasToken(a.id))
       if (!connected && !cancelReminder(r.key)) return
     }
     const due = resetReminders.takeDue()
     for (const r of due) {
-      const isCurrent = r.provider !== 'claude' || r.key === reminderKey('claude')
-      const { session, freshAt: readAt } = serviceState(r.provider)
-      const confirmed = isCurrent && readAt >= r.at && session?.pct != null && session.pct < r.pct
+      const isCurrent = r.key === reminderKey()
+      const session = realUsage?.session
+      const confirmed =
+        isCurrent && realUsageAt >= r.at && session?.pct != null && session.pct < r.pct
       const message = confirmed
         ? `${r.label}: session budget is available again.`
         : `${r.label}: the scheduled session reset time has arrived. Open usage to confirm the new budget.`
@@ -250,25 +208,21 @@ function checkResetReminders() {
   }
 }
 ipcMain.on('set-reminder', (_e, provider, enabled) => {
-  if (!Object.hasOwn(NAMES, provider) || typeof enabled !== 'boolean') return
-  const key = reminderKey(provider)
+  if (provider !== 'claude' || typeof enabled !== 'boolean') return
+  const key = reminderKey()
   if (!enabled) return cancelReminder(key)
-  const { session, readAt, freshAt, on } = serviceState(provider)
-  const at = readAt + (session?.resetMs || 0)
-  const connected = provider === 'claude' ? auth.isConnected() : on
+  const session = realUsage?.session
+  const at = realUsageAt + (session?.resetMs || 0)
   if (
-    !connected ||
-    !freshAt ||
-    Date.now() - freshAt > 15 * 60000 ||
+    !auth.isConnected() ||
+    !realUsageAt ||
+    Date.now() - realUsageAt > 15 * 60000 ||
     !Number.isFinite(session?.pct)
   ) {
     return sendReminders('Wait for a fresh usage reading before setting a reminder.')
   }
   try {
-    const label =
-      provider === 'claude'
-        ? `Claude · ${accounts.active().label || 'your account'}`
-        : NAMES[provider]
+    const label = `Claude · ${accounts.active().label || 'your account'}`
     if (!resetReminders.arm({ key, provider, label, at, pct: session.pct })) {
       return sendReminders('This reset time has passed. Wait for a fresh reading.')
     }
@@ -327,23 +281,6 @@ function checkAlerts(config, d) {
   ])
   checkWindowReset(config, session.pct)
 }
-// Codex has its own windows, so its own keys: `Codex session:80` never
-// collides with Claude's `Session:80`
-function checkCodexAlerts(config, c) {
-  if (!c) return
-  alertScopes(config, [
-    { label: 'Codex session', pct: c.session?.pct, resetMs: c.session?.resetMs, session: true },
-    { label: 'Codex weekly', pct: c.weekly?.pct, resetMs: c.weekly?.resetMs },
-  ])
-}
-// Cursor's budget is the billing cycle; its API-model pool fills on its own
-function checkCursorAlerts(config, c) {
-  if (!c) return
-  alertScopes(config, [
-    { label: 'Cursor usage', pct: c.session?.pct, resetMs: c.session?.resetMs },
-    { label: 'Cursor API models', pct: c.api?.pct, resetMs: c.api?.resetMs },
-  ])
-}
 // per-model weekly limits only exist on the account side, so they're checked
 // off the OAuth poll rather than the local tick
 function checkScopedAlerts(config, u) {
@@ -370,8 +307,8 @@ function checkWindowReset(config, pct) {
     was != null &&
     was >= RESET_FROM &&
     pct <= RESET_TO &&
-    !resetReminders.list().some((r) => r.key === reminderKey('claude')) &&
-    !resetReminders.recentlyDelivered(reminderKey('claude'))
+    !resetReminders.list().some((r) => r.key === reminderKey()) &&
+    !resetReminders.recentlyDelivered(reminderKey())
   ) {
     notify('Session window reset', 'full budget again')
   }
@@ -578,28 +515,6 @@ function createWindow() {
     } catch (err) {
       win.webContents.send('usage-error', String(err))
     }
-    // Codex is a separate, optional source: its failure must not blank Claude's
-    try {
-      const c = config.codex?.enabled ? codex.getCodexUsage() : null
-      codexUsage = c
-      codexReadAt = Date.now()
-      win.webContents.send('codex', c)
-      checkCodexAlerts(config, c)
-      updateTray()
-    } catch (err) {
-      console.error('codex:', err)
-    }
-    // Cursor too: limits come from a throttled background fetch
-    try {
-      const c = config.cursor?.enabled ? cursor.getCursorUsage() : null
-      cursorUsage = c
-      cursorReadAt = Date.now()
-      win.webContents.send('cursor', c)
-      checkCursorAlerts(config, c)
-      updateTray()
-    } catch (err) {
-      console.error('cursor:', err)
-    }
     checkResetReminders()
   }
   doTick = tick
@@ -691,14 +606,7 @@ function trayMenu() {
   return Menu.buildFromTemplate([
     { label: 'Open Clauddy', click: () => showPopover() },
     ...accountsMenuItems(),
-    ...(config.codex?.enabled || config.cursor?.enabled
-      ? ['claude', 'codex', 'cursor']
-          .filter((p) => p === 'claude' || config[p]?.enabled)
-          .map((p) => ({
-            label: `Open ${NAMES[p]} usage`,
-            click: () => shell.openExternal(USAGE_URLS[p]),
-          }))
-      : [{ label: 'Open Usage page', click: () => shell.openExternal(USAGE_URLS.claude) }]),
+    { label: 'Open Usage page', click: () => shell.openExternal(USAGE_URL) },
     { type: 'separator' },
     { label: 'Quit Clauddy', click: () => app.quit() },
   ])
@@ -793,22 +701,6 @@ function positionFloating() {
 // the tray shows the live session % (macOS title), turning 🔥 near the limit
 function updateTray() {
   if (!tray) return
-  const cx = codexUsage
-  const cu = cursorUsage
-  // several services: one icon, every number labelled — never one blended %
-  if (cx || cu) {
-    const fmt = (v) => (v == null ? '—' : `${Math.round(v)}%`)
-    const age = (u) => (u.limitsAt ? ` (as of ${new Date(u.limitsAt).toLocaleTimeString()})` : '')
-    const parts = [
-      sessionPct != null && ['C', `Claude session ${fmt(sessionPct)}`, sessionPct],
-      cx && ['X', `Codex session ${fmt(cx.session?.pct)}${age(cx)}`, cx.session?.pct],
-      cu && ['Cu', `Cursor usage ${fmt(cu.session?.pct)}${age(cu)}`, cu.session?.pct],
-    ].filter(Boolean)
-    const title = parts.map(([k, , v]) => `${k} ${fmt(v)}`).join(' · ')
-    if (process.platform === 'darwin') tray.setTitle(` ${title}`)
-    tray.setToolTip(`Clauddy — ${parts.map(([, t]) => t).join(' · ')}`)
-    return
-  }
   if (sessionPct == null) {
     if (process.platform === 'darwin') tray.setTitle('')
     tray.setToolTip('Clauddy — connect your account for live %')
@@ -877,30 +769,8 @@ ipcMain.on('resize', (_e, w, h) => {
   }
 })
 
-// the arrow opens the page of whichever service the panel is showing
-ipcMain.on('open-usage', (_e, provider) =>
-  shell.openExternal(USAGE_URLS[provider] || USAGE_URLS.claude),
-)
-
-// Settings → Connect Codex: look first; the renderer enables it when found
-ipcMain.on('codex-detect', () => {
-  let r = { found: false, plan: null }
-  try {
-    r = codex.detectCodex()
-  } catch {}
-  if (win && !win.isDestroyed()) win.webContents.send('codex-detected', r)
-})
-ipcMain.on('codex-enable', (_e, on) => setCodexEnabled(!!on))
-
-// Settings → Connect Cursor: it needs the Cursor app signed in on this machine
-ipcMain.on('cursor-detect', () => {
-  let r = { found: false, plan: null }
-  try {
-    r = cursor.detectCursor()
-  } catch {}
-  if (win && !win.isDestroyed()) win.webContents.send('cursor-detected', r)
-})
-ipcMain.on('cursor-enable', (_e, on) => setCursorEnabled(!!on))
+// the arrow opens Claude's usage page
+ipcMain.on('open-usage', () => shell.openExternal(USAGE_URL))
 
 // watch the debug file; forward forced states to the renderer
 function watchDebug() {
@@ -1073,7 +943,7 @@ ipcMain.on('auth-code', async (_e, code) => {
   }
 })
 ipcMain.on('auth-logout', () => {
-  cancelReminder(reminderKey('claude'))
+  cancelReminder(reminderKey())
   auth.clear()
   clearTimeout(usageTimer)
   pushRealUsage(null)
@@ -1084,32 +954,6 @@ ipcMain.on('auth-logout', () => {
   }
   profileShown = false
 })
-
-// off only stops monitoring here; Codex's own logs and login are untouched
-function setCodexEnabled(on) {
-  writeConfigPatch({ codex: { ...(config.codex || {}), enabled: on } })
-  config = loadConfig()
-  if (!on) {
-    codexUsage = null
-    cancelReminder('codex')
-  }
-  if (win && !win.isDestroyed()) win.webContents.send('config', publicConfig(config))
-  if (doTick) doTick()
-  updateTray()
-}
-
-// off only stops monitoring here; the Cursor app and its login are untouched
-function setCursorEnabled(on) {
-  writeConfigPatch({ cursor: { ...(config.cursor || {}), enabled: on } })
-  config = loadConfig()
-  if (!on) {
-    cursorUsage = null
-    cancelReminder('cursor')
-  }
-  if (win && !win.isDestroyed()) win.webContents.send('config', publicConfig(config))
-  if (doTick) doTick()
-  updateTray()
-}
 
 function writeConfigPatch(patch) {
   let obj = {}
@@ -1141,7 +985,7 @@ ipcMain.on('save-config', (_e, patch) => {
   applyMode(config.mode) // switch between floating widget and menu-bar popover live
 })
 
-// ---- self-update (checks the latest GitHub release, runs install.sh) ---------
+// ---- update check (compares with the latest GitHub release of this fork) -----
 async function fetchLatestTag() {
   const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
     headers: { 'User-Agent': 'Clauddy', Accept: 'application/vnd.github+json' },
@@ -1185,18 +1029,10 @@ async function autoUpdateCheck() {
     if (u.available) win.webContents.send('update-status', { state: 'available', latest: u.latest })
   } catch {} // offline / rate-limited: stay quiet, try again on the next tick
 }
+// Never pipe a remote script into a shell from inside the app: an update is a
+// deliberate, verified install (see install.sh), so just open the releases page.
 ipcMain.on('do-update', () => {
-  // Windows/Linux have no install.sh: send them to the releases page instead.
-  if (process.platform !== 'darwin') {
-    shell.openExternal(`https://github.com/${REPO}/releases/latest`)
-    return
-  }
-  if (win && !win.isDestroyed()) win.webContents.send('update-status', { state: 'updating' })
-  const cmd = `curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | bash`
-  const child = spawn('/bin/bash', ['-lc', cmd], { detached: true, stdio: 'ignore' })
-  child.unref()
-  // quit so the installer can replace the running .app and relaunch the new build
-  setTimeout(() => app.quit(), 1500)
+  shell.openExternal(`https://github.com/${REPO}/releases/latest`)
 })
 
 ipcMain.on('quit', () => app.quit())

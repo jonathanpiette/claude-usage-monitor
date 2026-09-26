@@ -148,7 +148,7 @@ function fmtReset(ms) {
 function fmtResetClock(ms) {
   if (!ms || ms <= 0) return null
   const at = new Date(Date.now() + ms)
-  // a week or more out (Cursor's month), a weekday would be ambiguous
+  // a week or more out, a weekday would be ambiguous
   if (ms >= 6 * 86400000) return at.toLocaleDateString([], { month: 'short', day: 'numeric' })
   const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
   return ms >= 86400000 ? `${at.toLocaleDateString([], { weekday: 'short' })} ${time}` : time
@@ -605,35 +605,8 @@ function takeRecap(was) {
   return r
 }
 
-// Codex and Cursor, followed whichever tab is on screen. Codex's logs only move
-// while it runs, so a stale reading keeps the baseline: the next fresh one is
-// compared against the last number actually seen.
-const lastExtPct = { codex: null, cursor: null }
-function listenExt(p) {
-  const c = dataOf(p)
-  if (!isOn(p) || !c) {
-    lastExtPct[p] = null
-    return
-  }
-  const pct = c.session?.pct
-  if (pct == null || readingStale(c)) return
-  const was = lastExtPct[p]
-  lastExtPct[p] = pct
-  if (was == null) return
-  const fireAt = currentConfig.fireThreshold ?? 90
-  const reset = c.session.resetMs
-  const name = NAMES[p]
-  if (was - pct > 25)
-    say(Voice.codexResetLine(was, name, p === 'cursor' ? 'month' : 'window'), { headline: true })
-  else if (was < 100 && pct >= 100)
-    say(Voice.codexMaxedLine(fmtResetClock(reset), name), { mood: 'sleepy' })
-  else if (was < fireAt && pct >= fireAt && pct < 100)
-    say(Voice.codexFireLine(pct, reset, fmtReset, name), { headline: true, mood: 'fire' })
-}
-
-// called by paint() with the state it just drew. The Claude remarks follow the
-// Claude view; Codex and Cursor have their own, above.
-function listen(before, st, { isExt, liveOn, sp, sessReset, proj }) {
+// called by paint() with the state it just drew
+function listen(before, st, { liveOn, sp, sessReset, proj }) {
   // the saved config decides whether it talks at all, and it lands just after
   // the first usage tick: speaking before it would ignore a "talk: false"
   if (!heardConfig) return
@@ -647,9 +620,6 @@ function listen(before, st, { isExt, liveOn, sp, sessReset, proj }) {
       if (say(line, { headline: true, mood })) return
     }
   }
-  listenExt('codex')
-  listenExt('cursor')
-  if (isExt) return
   const now = Date.now()
 
   if (liveOn) {
@@ -704,10 +674,6 @@ function sampleLine(kind) {
       fmtReset,
     )
   }
-  if (kind === 'codex')
-    return Voice.codexFireLine(91, codexData?.session?.resetMs ?? reset, fmtReset)
-  if (kind === 'cursor')
-    return Voice.codexFireLine(91, cursorData?.session?.resetMs ?? reset, fmtReset, 'Cursor')
   if (kind === 'maxed') return Voice.maxedLine(fmtResetClock(reset))
   if (kind === 'welcome') return Voice.welcomeLine(3 * 3600000 + 12 * 60000, pct ?? null, fmtReset)
   if (kind === 'streak') return Voice.streakLine(95 * 60000, fmtReset)
@@ -720,12 +686,7 @@ function sampleLine(kind) {
 }
 function sayDebug(kind) {
   const st = [...document.body.classList].find((c) => c.startsWith('state-'))?.slice(6)
-  const mood =
-    kind === 'fire' || kind === 'codex' || kind === 'cursor'
-      ? 'fire'
-      : kind === 'maxed'
-        ? 'sleepy'
-        : moodOf(st)
+  const mood = kind === 'fire' ? 'fire' : kind === 'maxed' ? 'sleepy' : moodOf(st)
   return say(sampleLine(kind), { force: true, mood })
 }
 
@@ -752,197 +713,27 @@ el('mute').addEventListener('click', (e) => {
   window.api.saveConfig({ soundMutedUntil: until })
 })
 
-// ---- services ---------------------------------------------------------------
-// Claude, Codex and Cursor are monitored side by side, but the panel shows one
-// at a time: tabs own the chip, meters, breakdowns and Usage arrow. The expanded
-// scene follows that view; compact pets follow activity across every service.
-const PROVIDER_KEY = 'clauddy.provider'
-const PROVIDERS = ['claude', 'codex', 'cursor']
-const NAMES = { claude: 'Claude', codex: 'Codex', cursor: 'Cursor' }
-let codexData = null // last Codex payload; null while Codex isn't enabled
-let cursorData = null // last Cursor payload; null while Cursor isn't enabled
-let pickedProvider = (() => {
-  try {
-    const p = localStorage.getItem(PROVIDER_KEY)
-    return PROVIDERS.includes(p) ? p : 'claude'
-  } catch {
-    return 'claude'
-  }
-})()
-
+// ---- Claude usage ------------------------------------------------------------
 const claudeOn = () => document.body.classList.contains('auth-on')
-const codexOn = () => !!currentConfig.codex
-const cursorOn = () => !!currentConfig.cursor
-const isOn = (p) => (p === 'claude' ? claudeOn() : p === 'codex' ? codexOn() : cursorOn())
-const connected = () => PROVIDERS.filter(isOn)
-// Codex and Cursor payloads; Claude's live in lastData + realUsage
-const dataOf = (p) => (p === 'codex' ? codexData : p === 'cursor' ? cursorData : null)
-// each service's two meters: the window that resets, and the one beside it
-const sessionOf = (p) => (p === 'claude' ? realUsage?.session : dataOf(p)?.session)
-const secondOf = (p) =>
-  p === 'claude' ? realUsage?.week : p === 'codex' ? codexData?.weekly : cursorData?.api
-// the service on screen: the pick, unless that one isn't there any more
-function viewProvider() {
-  const on = connected()
-  return on.includes(pickedProvider) ? pickedProvider : on[0] || 'claude'
-}
-
-function pickProvider(p) {
-  if (p === pickedProvider) return
-  pickedProvider = p
-  try {
-    localStorage.setItem(PROVIDER_KEY, p)
-  } catch {}
-  paint()
-}
-
 const STALE_MS = 15 * 60000
-const CODEX_SLEEP_MS = 5 * 60000 // main's default sleepThresholdMs
-// Codex logs are only written while it runs, so a reading can be hours old;
-// Cursor's comes from a fetch that can fail. Either way: say how old it is.
-const readingStale = (c) =>
-  !!c && (c.session?.expired || (c.limitsAt != null && Date.now() - c.limitsAt > STALE_MS))
 
-// the highest session % across connected services, and which ones are at or
-// past `from`; an expired Codex or Cursor reading is null, so it never counts
+// the connected session %, and whether it is at or past `from`
 function sessionHeat(from) {
-  const known = connected()
-    .map((p) => [p, sessionOf(p)?.pct])
-    .filter(([, pct]) => pct != null)
-  return {
-    pct: Math.max(0, ...known.map(([, pct]) => pct)),
-    providers: known.filter(([, pct]) => pct >= from).map(([p]) => p),
-  }
-}
-
-// Codex's or Cursor's numbers in the shape the panel draws. Codex's logs carry
-// tokens but no activity; Cursor's transcripts carry activity but no tokens.
-function extView(p, c) {
-  const idleFor = c.lastSeen ? Date.now() - c.lastSeen : null
-  return {
-    d: {
-      active: c.active,
-      activity: p === 'cursor' ? c.activity : null,
-      // no data is not the same as asleep
-      sleeping: !c.active && idleFor != null && idleFor >= CODEX_SLEEP_MS,
-      tokensPerMin: 0,
-      today: { tokens: c.tokensToday || 0 },
-      session: { tokens: c.tokens5h || 0 },
-      week: { tokens: c.tokensWeek || 0 },
-      byModel: c.byModel || [],
-      byProject: c.byProject || [],
-      days30: c.days30 || [],
-      monthTokens: c.monthTokens ?? null,
-    },
-    sess: c.session,
-    week: p === 'cursor' ? c.api : c.weekly,
-    stale: c.limitsAt != null && Date.now() - c.limitsAt > STALE_MS ? c.limitsAt : null,
-  }
-}
-
-// a Codex or Cursor meter caption: its reset, or how old the reading is when
-// that's what matters. Cursor has no token counts, so `tokens` is null there.
-function extSub(w, tokens, stale, empty = 'limits not recorded yet') {
-  const t = tokens == null ? '' : `${fmtTokens(tokens)} tokens`
-  const join = (...parts) => parts.filter(Boolean).join(' · ')
-  if (!w) return join(empty, t)
-  if (w.pct == null) return join('waiting for a fresh reading', t)
-  if (stale) {
-    const at = w.resetMs != null ? `resets ${fmtResetClock(w.resetMs)}` : ''
-    return join(at, `read ${fmtReset(Date.now() - stale)} ago`)
-  }
-  return join(w.resetMs != null ? `resets in ${fmtResetIn(w.resetMs)}` : '', t) || '—'
+  const pct = claudeOn() ? realUsage?.session?.pct : null
+  if (pct == null) return { pct: 0, providers: [] }
+  return { pct: Math.max(0, pct), providers: pct >= from ? ['claude'] : [] }
 }
 
 const pctText = (v) => (v == null ? '—' : `${Math.round(v)}%`)
 const warnAt = () => Math.min(...(currentConfig.alertThresholds || [80, 95]))
 
-// tabs + the collapsed dock: every service's session %, whichever is on screen
-function paintServices(view) {
-  const on = connected()
-  const many = on.length > 1
-  document.body.classList.toggle('dual', many)
-  document.body.classList.toggle('trio', on.length > 2)
-  for (const p of ['codex', 'cursor']) document.body.classList.toggle(`view-${p}`, view === p)
-  // collapsed with several: when the selected service's window resets
-  const resetMs = sessionOf(view)?.resetMs
-  el('mini-reset').hidden = !many || resetMs == null
-  el('mini-reset').textContent = resetMs == null ? '' : `resets ${fmtResetClock(resetMs)}`
-  el('service-panel').setAttribute('role', many ? 'tabpanel' : 'region')
-  if (many) {
-    el('service-panel').setAttribute('aria-labelledby', `tab-${view}`)
-    el('service-panel').removeAttribute('aria-label')
-  } else {
-    el('service-panel').removeAttribute('aria-labelledby')
-    el('service-panel').setAttribute('aria-label', `${NAMES[view]} usage`)
-    return
-  }
-  // what each service calls its two meters
-  const labels = {
-    claude: ['session', 'weekly'],
-    codex: ['session', 'weekly'],
-    cursor: ['month', 'API'],
-  }
-  for (const p of PROVIDERS) {
-    const tab = el(`tab-${p}`)
-    const line = document.querySelector(`.mini-source[data-provider="${p}"]`)
-    tab.hidden = !on.includes(p)
-    line.hidden = tab.hidden
-    if (tab.hidden) continue
-    const pct = sessionOf(p)?.pct ?? null
-    const second = secondOf(p)?.pct ?? null
-    const active = p === 'claude' ? !!lastData?.active : !!dataOf(p)?.active
-    const stale = p !== 'claude' && readingStale(dataOf(p))
-    const selected = p === view
-    const urgent = Math.max(pct ?? 0, second ?? 0) >= warnAt()
-    tab.setAttribute('aria-selected', String(selected))
-    tab.tabIndex = selected ? 0 : -1
-    tab.classList.toggle('active', active)
-    tab.classList.toggle('urgent', urgent)
-    tab.querySelector('.tab-alert').hidden = !urgent
-    el(`tab-${p}-value`).textContent = pctText(pct)
-    const [first, next] = labels[p]
-    tab.title = `${NAMES[p]} ${first} ${pctText(pct)} · ${next} ${pctText(second)}${active ? ' · working' : ''}${stale ? ' · not updated recently' : ''}`
-    line.setAttribute('aria-pressed', String(selected))
-    line.title = tab.title
-    line.setAttribute('aria-label', `Show ${tab.title}`)
-    line.classList.toggle('urgent', urgent)
-    tab.setAttribute('aria-label', `Show ${tab.title}`)
-    el(`mini-${p}-value`).textContent = pctText(pct)
-    const bar = el(`mini-${p}-bar`)
-    bar.style.width = `${Math.min(pct ?? 0, 100)}%`
-    bar.classList.toggle('hot', (pct ?? 0) >= 80)
-  }
-}
-
-for (const b of document.querySelectorAll('#harness-tabs button, .mini-source')) {
-  b.addEventListener('click', (e) => {
-    e.stopPropagation()
-    pickProvider(b.dataset.provider)
-  })
-}
-el('harness-tabs').addEventListener('keydown', (e) => {
-  const providers = connected()
-  const current = providers.indexOf(e.target.dataset.provider)
-  if (current < 0) return
-  let next
-  if (e.key === 'ArrowRight') next = (current + 1) % providers.length
-  else if (e.key === 'ArrowLeft') next = (current + providers.length - 1) % providers.length
-  else if (e.key === 'Home') next = 0
-  else if (e.key === 'End') next = providers.length - 1
-  else return
-  e.preventDefault()
-  pickProvider(providers[next])
-  el(`tab-${providers[next]}`).focus()
-})
-
-// ---- companion: pet-only size, reset reminders, and provider reactions -------
+// ---- companion: pet-only size, reset reminders, and activity reactions -------
 const SIZE_KEY = 'clauddy.size'
 let sizeLoaded = false
 let peekTimer = null
 let nativePetInside = null
 let noticeTimer = null
-let reminders = { claude: null, codex: null, cursor: null }
+let reminders = { claude: null }
 const activityTracker = Companion.createActivityTracker()
 
 function setPetPeek(on) {
@@ -1013,56 +804,37 @@ el('pet').addEventListener('keydown', (e) => {
     setPetPeek(false)
   }
 })
-for (const button of document.querySelectorAll('#pet-glance button[data-provider]')) {
-  button.addEventListener('click', () => pickProvider(button.dataset.provider))
-}
-function paintCompanion(view) {
-  for (const provider of PROVIDERS) {
-    const session = sessionOf(provider)
-    const button = el(`glance-${provider}`)
-    button.hidden = !isOn(provider)
-    button.setAttribute('aria-pressed', String(provider === view))
-    button.classList.toggle('urgent', session?.pct >= warnAt())
-    el(`glance-${provider}-value`).textContent = pctText(session?.pct)
-    const stale = provider !== 'claude' && readingStale(dataOf(provider))
-    button.title = stale
-      ? 'Last recorded usage · waiting for a fresh reading'
-      : `Show ${provider} usage`
-    button.classList.toggle('stale-reading', !!stale)
-  }
-  el('glance-empty').hidden = connected().length > 0
-  const session = sessionOf(view)
-  const reminder = reminders[view]
-  const ext = dataOf(view)
-  const stale =
-    view === 'claude'
-      ? !realUsageReadAt || Date.now() - realUsageReadAt > STALE_MS
-      : !ext?.limitsAt || readingStale(ext)
+function paintCompanion() {
+  const session = realUsage?.session
+  el('glance-claude').hidden = !claudeOn()
+  el('glance-claude').classList.toggle('urgent', session?.pct >= warnAt())
+  el('glance-claude-value').textContent = pctText(session?.pct)
+  el('glance-empty').hidden = claudeOn()
+  const reminder = reminders.claude
+  const stale = !realUsageReadAt || Date.now() - realUsageReadAt > STALE_MS
   const available = session?.pct != null && session.resetMs > 0 && !stale
-  const name = NAMES[view]
   for (const id of ['reminder-toggle', 'mini-reminder']) {
     const button = el(id)
     button.hidden = !reminder && (!available || session.pct < warnAt())
     button.setAttribute('aria-pressed', String(!!reminder))
     button.textContent = reminder ? '✓ Reminder on' : 'Notify at reset'
     const at = reminder ? new Date(reminder.at) : null
-    // a month-out reset needs its date, not just a time
+    // a reset a day or more out needs its date, not just a time
     const when = at
       ? at.getTime() - Date.now() >= 86400000
         ? at.toLocaleDateString([], { month: 'short', day: 'numeric' })
         : at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
       : ''
     button.title = reminder
-      ? `Cancel ${name} reminder for ${when}`
-      : `Remind me when ${name}'s ${view === 'cursor' ? 'monthly' : 'session'} reset is due`
+      ? `Cancel Claude reminder for ${when}`
+      : "Remind me when Claude's session reset is due"
   }
 }
-function companionNotice(text, provider = null) {
+function companionNotice(text) {
   clearTimeout(noticeTimer)
   const notice = el('companion-notice')
   notice.textContent = text
   notice.title = text
-  notice.dataset.provider = provider || ''
   notice.hidden = false
   fitSize()
   noticeTimer = setTimeout(() => {
@@ -1071,38 +843,29 @@ function companionNotice(text, provider = null) {
   }, 5000)
 }
 for (const id of ['reminder-toggle', 'mini-reminder']) {
-  el(id).addEventListener('click', () => {
-    const provider = viewProvider()
-    window.api.setReminder(provider, !reminders[provider])
-  })
+  el(id).addEventListener('click', () => window.api.setReminder('claude', !reminders.claude))
 }
 window.api.onReminders((state) => {
-  reminders = state || { claude: null, codex: null, cursor: null }
+  reminders = state || { claude: null }
   if (state?.error) companionNotice(state.error)
-  paintCompanion(viewProvider())
+  paintCompanion()
   fitSize()
 })
 window.api.onReminderDue((event) => {
   if (!event.isCurrent) return
-  const name = NAMES[event.provider] || 'Claude'
-  companionNotice(
-    event.confirmed ? `${name} · budget is back!` : `${name} · reset time reached`,
-    event.provider,
-  )
+  companionNotice(event.confirmed ? 'Claude · budget is back!' : 'Claude · reset time reached')
   if (event.confirmed) celebrate()
 })
 function reactToProvider(provider, data) {
-  // no caption: the eyes glance toward whichever service changed
+  // no caption: the eyes glance aside when the activity changes
   const cue = activityTracker.observe(provider, data)
   if (!cue || document.body.classList.contains('settings-open')) return
   if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-    // in tab order: Claude to the left, Codex to the right, Cursor down-right
-    const [x, y] = { claude: [-3, 0], codex: [3, 0], cursor: [3, 1] }[provider] || [0, 0]
     el('eyes').animate(
       [
         { transform: 'translate(0, 0)' },
-        { transform: `translate(${x}px, ${y}px)`, offset: 0.3 },
-        { transform: `translate(${x}px, ${y}px)`, offset: 0.7 },
+        { transform: 'translate(-3px, 0px)', offset: 0.3 },
+        { transform: 'translate(-3px, 0px)', offset: 0.7 },
         { transform: 'translate(0, 0)' },
       ],
       { duration: 1100, easing: 'ease-in-out' },
@@ -1113,31 +876,26 @@ function reactToProvider(provider, data) {
 function paintActivity() {
   const activity = Companion.currentActivity({
     claude: claudeOn() ? claudeActivityData : null,
-    codex: codexOn() ? codexData : null,
-    cursor: cursorOn() ? cursorData : null,
   })
   paintLogos(activity.providers, activity.activity)
   return activity
 }
 
-// the logos under the pet name who it's about: the workers, or the service on fire
+// the logo under the pet says Claude is working, on fire, or maxed out
 function paintLogos(providers, caption) {
-  const names = providers.map((p) => NAMES[p]).join(' + ')
-  const label = names ? `${names} · ${caption}` : ''
+  const on = providers.includes('claude')
+  const label = on ? `Claude · ${caption}` : ''
   for (const id of ['pet-activity', 'mini-workers']) {
     const badge = el(id)
-    badge.hidden = !names
+    badge.hidden = !on
     badge.setAttribute('aria-label', label)
-    for (const logo of badge.querySelectorAll('[data-provider]')) {
-      logo.hidden = !providers.includes(logo.dataset.provider)
-    }
   }
   el('mini-dot').hidden = providers.length > 0 && document.body.classList.contains('collapsed')
 }
 
 // main render
 let prevState = null
-const prevPct = {} // per service: a switch must not read as a reset
+let prevPct = null // the last session %, to spot a window reset
 let lastData = null
 // Claude's activity, kept apart from lastData: an account switch or a logout
 // must drop the old account's worker at once, not a tick later
@@ -1154,28 +912,18 @@ function render(d) {
 }
 
 function paint() {
-  setPlan(el('codex-plan'), codexData?.plan)
-  setPlan(el('cursor-plan'), cursorData?.plan)
   paintConnections()
-  const d0 = lastData
-  if (!d0) return
-  const view = viewProvider()
-  paintServices(view)
-  paintCompanion(view)
-  // Codex or Cursor on screen: their own numbers, never Claude's
-  const ext = view !== 'claude' ? dataOf(view) : null
-  const isExt = !!ext
-  const isCursor = view === 'cursor' && isExt
-  const cv = isExt ? extView(view, ext) : null
-  const d = isExt ? cv.d : d0
-  // % comes only from the connected account (or the service's own data) — no estimates
-  const liveOn = isExt || !!realUsage
+  const d = lastData
+  if (!d) return
+  paintCompanion()
+  // % comes only from the connected account: no estimates
+  const liveOn = !!realUsage
   document.body.classList.toggle('live', liveOn)
-  const sessPct = isExt ? (cv.sess?.pct ?? null) : liveOn ? realUsage.session.pct : 0
-  const sessReset = isExt ? (cv.sess?.resetMs ?? null) : liveOn ? realUsage.session.resetMs : null
+  const sessPct = liveOn ? realUsage.session.pct : 0
+  const sessReset = liveOn ? realUsage.session.resetMs : null
   const sessActive = liveOn && sessReset != null
-  const wkPct = isExt ? (cv.week?.pct ?? null) : liveOn ? realUsage.week.pct : 0
-  const wkReset = isExt ? (cv.week?.resetMs ?? null) : liveOn ? realUsage.week.resetMs : null
+  const wkPct = liveOn ? realUsage.week.pct : 0
+  const wkReset = liveOn ? realUsage.week.resetMs : null
   const sp = sessPct ?? 0
   const wp = wkPct ?? 0
 
@@ -1253,25 +1001,17 @@ function paint() {
             : 'idle'
   el('status-text').textContent = word
   el('mini-text').textContent = word
-  // Cursor's transcripts carry no tokens: when it last ran is what there is to say
-  const ranAgo = isCursor && ext.lastSeen ? Date.now() - ext.lastSeen : null
-  el('rate').textContent = isCursor
-    ? ranAgo == null
-      ? 'no agent runs yet'
-      : ranAgo < 60000
-        ? 'agent ran just now'
-        : `agent ran ${fmtReset(ranAgo)} ago`
-    : d.active && d.tokensPerMin > 0
+  el('rate').textContent =
+    d.active && d.tokensPerMin > 0
       ? `${fmtTokens(d.tokensPerMin)} tok/min`
       : `${fmtTokens(d.today.tokens)} tokens today`
 
-  const was = prevPct[view]
+  const was = prevPct
   if (liveOn && was != null && sessActive && sessPct != null && was - sessPct > 25) {
     celebrate()
-    // Codex's and Cursor's own resets are called out by listenExt, on screen or not
-    if (!isExt) say(Voice.recapLine(takeRecap(was), fmtTokens, fmtReset), { headline: true })
+    say(Voice.recapLine(takeRecap(was), fmtTokens, fmtReset), { headline: true })
   }
-  prevPct[view] = sessPct
+  prevPct = sessPct
   el('session-pct').textContent = pctText(liveOn ? sessPct : 0)
   setLevel(el('session-pct'), liveOn ? sp : 0)
   const mini = el('mini-pct')
@@ -1288,24 +1028,12 @@ function paint() {
   sf.style.width = `${sp}%`
   sf.classList.toggle('high', sp >= 80)
   setLevel(sf, sp)
-  el('session-label').textContent = isCursor ? 'this month · included' : 'current session'
-  el('week-label').textContent = isCursor ? 'API models · this month' : 'weekly · all models'
-  el('session-sub').textContent = isExt
-    ? isCursor
-      ? extSub(
-          cv.sess,
-          null,
-          cv.stale,
-          ext.signedOut ? 'sign in to the Cursor app' : 'no reading yet',
-        )
-      : extSub(cv.sess, d.session.tokens, cv.stale)
-    : sessActive
-      ? `resets in ${fmtResetIn(sessReset)} · ${fmtTokens(d.session.tokens)} tokens`
-      : 'no active session'
+  el('session-sub').textContent = sessActive
+    ? `resets in ${fmtResetIn(sessReset)} · ${fmtTokens(d.session.tokens)} tokens`
+    : 'no active session'
 
-  // where this pace is taking you — Claude's only: the others have no trail to read
-  const proj =
-    !isExt && sessActive && sp < 100 ? burn.project(sp, sessReset, d.session.tokens) : null
+  // where this pace is taking you
+  const proj = sessActive && sp < 100 ? burn.project(sp, sessReset, d.session.tokens) : null
   const pe = el('session-proj')
   pe.hidden = !proj
   pe.classList.toggle('tight', proj?.kind === 'eta')
@@ -1320,15 +1048,12 @@ function paint() {
   wf.style.width = `${wp}%`
   wf.classList.toggle('high', wp >= 80)
   setLevel(wf, wp)
-  el('week-sub').textContent = isExt
-    ? isCursor
-      ? extSub(cv.week, null, cv.stale, '—')
-      : extSub(cv.week, d.week.tokens, cv.stale)
-    : wkReset != null
+  el('week-sub').textContent =
+    wkReset != null
       ? `resets in ${fmtResetIn(wkReset)} · ${fmtTokens(d.week.tokens)} tokens`
       : `${fmtTokens(d.week.tokens)} tokens · last 7 days`
 
-  renderScoped(!isExt && liveOn ? realUsage.scoped || [] : [], d.byModel || [])
+  renderScoped(liveOn ? realUsage.scoped || [] : [], d.byModel || [])
   renderModels(d.byModel || [])
   renderProjects(d.byProject || [])
   renderHeat(d.days30 || [])
@@ -1337,7 +1062,7 @@ function paint() {
 
   // compact eats at Claude's pace only while Claude is one of the workers
   const claudeRate = !collapsedNow || activity.providers.includes('claude')
-  currentRate = claudeRate ? (collapsedNow ? d0 : d).tokensPerMin || 0 : 0
+  currentRate = claudeRate ? d.tokensPerMin || 0 : 0
   if (st === 'working') {
     if (!eating) {
       eating = true
@@ -1348,7 +1073,7 @@ function paint() {
     stopEating()
   }
 
-  listen(before, st, { isExt, liveOn, sp, sessReset, proj })
+  listen(before, st, { liveOn, sp, sessReset, proj })
   fitSize()
 }
 
@@ -1359,12 +1084,8 @@ function fitSize() {
   requestAnimationFrame(() => {
     const collapsed = document.body.classList.contains('collapsed')
     const zoom = Number.parseFloat(document.body.style.zoom) || 1
-    // The multi-service dock trades height for a little horizontal room, and
-    // three readings widen the pet-only glance.
-    const dual = document.body.classList.contains('dual')
-    const trio = document.body.classList.contains('trio')
     const petOnly = document.body.classList.contains('pet-only')
-    const w = (petOnly ? (trio ? 212 : 168) : collapsed ? (dual ? 240 : 192) : 304) * zoom
+    const w = (petOnly ? 168 : collapsed ? 192 : 304) * zoom
     // offsetHeight never reflects a CSS zoom applied to an ancestor (confirmed
     // empirically against this Electron build) — so measure the unzoomed content
     // height, then scale the whole thing (content + margin) ourselves
@@ -1403,12 +1124,6 @@ window.api.onError((msg) => {
 window.api.onConfig((cfg) => {
   currentConfig = cfg || {}
   document.body.classList.toggle('is-menubar', currentConfig.mode === 'menubar')
-  document.body.classList.toggle('codex-on', !!currentConfig.codex)
-  if (!currentConfig.codex) codexData = null
-  if (!currentConfig.codex) activityTracker.forget('codex')
-  document.body.classList.toggle('cursor-on', !!currentConfig.cursor)
-  if (!currentConfig.cursor) cursorData = null
-  if (!currentConfig.cursor) activityTracker.forget('cursor')
   if (!sizeLoaded) {
     sizeLoaded = true
     let size = 'expanded'
@@ -1424,16 +1139,6 @@ window.api.onConfig((cfg) => {
   paint()
   applyZoom(currentConfig.zoom)
   fitSize()
-})
-window.api.onCodex((c) => {
-  codexData = c || null
-  reactToProvider('codex', codexOn() ? c : null)
-  paint()
-})
-window.api.onCursor((c) => {
-  cursorData = c || null
-  reactToProvider('cursor', cursorOn() ? c : null)
-  paint()
 })
 window.api.onRealUsage((u) => {
   realUsage = u || null
@@ -1453,7 +1158,7 @@ window.api.onAuthState((s) => {
     endLogin()
     showProfile(null)
   }
-  paint() // losing Claude can leave Codex or Cursor as the only service
+  paint()
   if (document.body.classList.contains('settings-open')) fitSize()
 })
 
@@ -1481,20 +1186,6 @@ function paintChip() {
   el('acc-ok').title = email || 'Connected'
   const chip = el('account-chip')
   const mini = el('mini-acct')
-  // the Codex and Cursor views never borrow Claude's identity
-  const view = viewProvider()
-  if (view !== 'claude') {
-    const plan = dataOf(view)?.plan || null
-    const name = NAMES[view]
-    el('ac-email').textContent = name
-    chip.title = `${name} on this computer`
-    setPlan(el('ac-plan'), plan)
-    chip.hidden = false
-    el('mini-acct-name').textContent = name
-    setPlan(el('mini-acct-plan'), plan)
-    mini.hidden = false
-    return
-  }
   if (!email) {
     chip.hidden = true
     mini.hidden = true
@@ -1632,8 +1323,6 @@ function toggleAccountMenu() {
 
 el('account-chip').addEventListener('click', (e) => {
   e.stopPropagation()
-  // Codex and Cursor have no account switcher: their chip leads to their card
-  if (viewProvider() !== 'claude') return openSettings(viewProvider())
   toggleAccountMenu()
 })
 // clicking anywhere else — the pet, the gear, another app — puts it away
@@ -1782,64 +1471,7 @@ for (const head of document.querySelectorAll('.sec-head')) {
 for (const id of readFolded()) toggleSection(id, true)
 
 el('close').addEventListener('click', () => window.api.quit())
-el('usage').addEventListener('click', () => window.api.openUsage(viewProvider()))
-
-// Settings → Codex: Connect looks for a local session and turns monitoring on if found
-function endCodexSetup() {
-  document.body.classList.remove('codex-setup')
-  el('codex-setup').hidden = true
-  el('codex-hint').textContent = 'Track Codex alongside Claude, in this pet.'
-}
-el('codex-connect').addEventListener('click', () => {
-  el('codex-hint').textContent = 'Looking…'
-  window.api.codexDetect()
-})
-el('codex-retry').addEventListener('click', () => window.api.codexDetect())
-// Connect is the consent: found → monitoring starts, not found → say why
-window.api.onCodexDetected((r) => {
-  if (r?.found) {
-    endCodexSetup()
-    window.api.codexEnable(true)
-    return
-  }
-  document.body.classList.add('codex-setup')
-  el('codex-setup').hidden = false
-  el('codex-hint').textContent = 'No session — sign in to Codex'
-  fitSize()
-})
-el('codex-setup-cancel').addEventListener('click', () => {
-  endCodexSetup()
-  fitSize()
-})
-el('codex-disconnect').addEventListener('click', () => window.api.codexEnable(false))
-
-// Settings → Cursor: the same, but what it looks for is the Cursor app's login
-function endCursorSetup() {
-  document.body.classList.remove('cursor-setup')
-  el('cursor-setup').hidden = true
-  el('cursor-hint').textContent = 'Track Cursor alongside Claude, in this pet.'
-}
-el('cursor-connect').addEventListener('click', () => {
-  el('cursor-hint').textContent = 'Looking…'
-  window.api.cursorDetect()
-})
-el('cursor-retry').addEventListener('click', () => window.api.cursorDetect())
-window.api.onCursorDetected((r) => {
-  if (r?.found) {
-    endCursorSetup()
-    window.api.cursorEnable(true)
-    return
-  }
-  document.body.classList.add('cursor-setup')
-  el('cursor-setup').hidden = false
-  el('cursor-hint').textContent = 'Not signed in — open the Cursor app and log in'
-  fitSize()
-})
-el('cursor-setup-cancel').addEventListener('click', () => {
-  endCursorSetup()
-  fitSize()
-})
-el('cursor-disconnect').addEventListener('click', () => window.api.cursorEnable(false))
+el('usage').addEventListener('click', () => window.api.openUsage())
 
 // account login (browser flow)
 el('acc-connect').addEventListener('click', () => window.api.authStart())
@@ -1895,28 +1527,22 @@ window.api.onUpdateStatus((s) => {
     status.className = 'ok'
   } else if (state === 'available') {
     // the button carries the version, so no separate status text is needed
-    now.textContent = `Update to ${s.latest}`
+    now.textContent = `Get ${s.latest}`
     now.hidden = false
-    check.hidden = true
-  } else if (state === 'updating') {
-    status.textContent = 'Updating… the app will restart'
     check.hidden = true
   } else if (state === 'error') {
     status.textContent = 'Check failed'
     status.className = 'err'
   }
   // pulse a dot on the gear whenever an update is waiting (cleared once it's
-  // up to date or actively updating) — so it's noticeable without opening Settings
+  // up to date), so it's noticeable without opening Settings
   if (state === 'available') document.body.classList.add('has-update')
-  else if (state === 'uptodate' || state === 'updating')
-    document.body.classList.remove('has-update')
+  else if (state === 'uptodate') document.body.classList.remove('has-update')
   if (document.body.classList.contains('settings-open')) fitSize()
 })
 el('upd-check').addEventListener('click', () => window.api.checkUpdates())
-el('upd-now').addEventListener('click', () => {
-  el('upd-now').disabled = true
-  window.api.doUpdate()
-})
+// opens the release page: installing is a deliberate, checksum-verified step
+el('upd-now').addEventListener('click', () => window.api.doUpdate())
 
 // settings panel
 // snapshot of the editable fields, to tell whether there are unsaved changes
@@ -1983,7 +1609,7 @@ function populateSettings() {
   reflectTalkOn()
   clearSaveDirty() // fields now match the saved config
 }
-// `provider` opens that service's connection card straight away
+// `provider` ('claude') opens its connection card straight away
 function openSettings(provider = null) {
   hideBubble()
   setDisplaySize('expanded', false)
@@ -1993,8 +1619,8 @@ function openSettings(provider = null) {
   fitSize()
 }
 
-// Settings → Connections: a tile per service says whether it's on (a check and
-// its plan); a click opens its card underneath, one at a time
+// Settings → Connections: the Claude tile says whether it's on (a check and
+// its plan); a click opens its card underneath
 let openConn = null
 function openConnection(provider) {
   openConn = provider
@@ -2002,24 +1628,21 @@ function openConnection(provider) {
   fitSize()
 }
 function paintConnections() {
-  const plans = { claude: lastProfile?.plan, codex: codexData?.plan, cursor: cursorData?.plan }
-  for (const p of PROVIDERS) {
-    const tile = el(`conn-${p}`)
-    const on = isOn(p)
-    const plan = on ? plans[p] || null : null
-    const open = openConn === p
-    tile.setAttribute('aria-expanded', String(open))
-    tile.classList.toggle('on', on)
-    tile.querySelector('.conn-check').hidden = !on
-    const state = el(`conn-${p}-state`)
-    state.textContent = on ? plan || 'Connected' : 'Connect'
-    state.classList.toggle('plan-badge', !!plan)
-    tile.setAttribute(
-      'aria-label',
-      `${NAMES[p]} · ${on ? `connected${plan ? `, ${plan}` : ''}` : 'not connected'}`,
-    )
-    el(p === 'claude' ? 'account' : `${p}-settings`).classList.toggle('open', open)
-  }
+  const tile = el('conn-claude')
+  const on = claudeOn()
+  const plan = on ? lastProfile?.plan || null : null
+  const open = openConn === 'claude'
+  tile.setAttribute('aria-expanded', String(open))
+  tile.classList.toggle('on', on)
+  tile.querySelector('.conn-check').hidden = !on
+  const state = el('conn-claude-state')
+  state.textContent = on ? plan || 'Connected' : 'Connect'
+  state.classList.toggle('plan-badge', !!plan)
+  tile.setAttribute(
+    'aria-label',
+    `Claude · ${on ? `connected${plan ? `, ${plan}` : ''}` : 'not connected'}`,
+  )
+  el('account').classList.toggle('open', open)
 }
 for (const tile of document.querySelectorAll('.conn-tile')) {
   tile.addEventListener('click', () =>
@@ -2034,8 +1657,6 @@ let closingTimer = null
 function closeSettings() {
   if (!document.body.classList.contains('settings-open')) return
   abandonLogin()
-  endCodexSetup()
-  endCursorSetup()
   openConn = null
   paintConnections()
   document.body.classList.remove('settings-open')
@@ -2170,7 +1791,6 @@ if (typeof module === 'object' && module.exports) {
     renderAccounts,
     renderAccountMenu,
     paint,
-    pickProvider,
     burn,
     say,
     hideBubble,
