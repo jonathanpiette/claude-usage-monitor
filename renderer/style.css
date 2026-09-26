@@ -1,7 +1,7 @@
 :root {
   --coral: #d97757;
   --coral-soft: #e6a07f;
-  --pixel: #d57658; /* pet terracotta — matches the real Claude logo */
+  --pixel: #d57658; /* pet terracotta - matches the real Claude logo */
   --eye: #221b16;
   --text: #eeeae5;
   --muted: #a39f98;
@@ -213,11 +213,11 @@ body.collapsed #usage {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-/* a single account still opens the menu — that is how a second one is added */
-/* the chevron stays even with a single account — it is the only hint that the
+/* a single account still opens the menu - that is how a second one is added */
+/* the chevron stays even with a single account - it is the only hint that the
    menu exists at all, and that is where another account gets added */
 /* the widget is mostly a drag region, and those swallow clicks before the page
-   ever sees them — so an invisible sheet under the menu catches them instead */
+   ever sees them - so an invisible sheet under the menu catches them instead */
 #acc-backdrop {
   position: fixed;
   inset: 0;
@@ -288,7 +288,7 @@ body.collapsed #usage {
 }
 #ac-email {
   /* line-height:1 leaves the ascender inside the box, so the text reads a hair
-     lower than the dot next to it — lift it back onto the same line */
+     lower than the dot next to it - lift it back onto the same line */
   transform: translateY(-1px);
   flex: 1; /* claim the leftover width so the ellipsis is not left hanging */
   min-width: 0;
@@ -336,7 +336,7 @@ body.collapsed #mini-acct-name {
 
 /* settings panel */
 /* stays in flow so the card keeps a height the window can be sized to (pet.js
-   measures #card) — it still reads as an overlay because the stage, the content
+   measures #card) - it still reads as an overlay because the stage, the content
    and the mini line all sit this screen out. The negative margins bleed its
    background to the card's edges, past the card's own padding. */
 #settings {
@@ -564,7 +564,7 @@ input[type="number"]::-webkit-outer-spin-button {
 body.is-menubar #min {
   display: none;
 }
-/* settings rows: label on the left, control on the right — one setting per
+/* settings rows: label on the left, control on the right - one setting per
    line so the screen stays short. Alert thresholds indent under their toggle
    and dim while alerts are off. */
 #set-rows {
@@ -580,7 +580,7 @@ body.is-menubar #min {
   margin-top: 11px;
 }
 /* the stepper rows stack, so they read as a group at a tighter pitch than the
-   reference's 14px — the steppers already carry their own height */
+   reference's 14px - the steppers already carry their own height */
 .set-row:has(.num) {
   margin-top: 5px;
 } /* flat,
@@ -759,7 +759,7 @@ but visibly nested: a soft coral guide bar ties the pair to the
 }
 #set-save.dirty,
 #set-save.dirty:hover {
-  color: #261a12; /* filled coral now — dark text, not white */
+  color: #261a12; /* filled coral now - dark text, not white */
 }
 #set-save.dirty:hover {
   background: #e2a07f;
@@ -811,8 +811,8 @@ but visibly nested: a soft coral guide bar ties the pair to the
 #upd-status.err {
   color: var(--coral);
 }
-/* compact update button — lighter than the full-width .acc-btn */
-/* once an update is offered, the button says it — the check link is redundant
+/* compact update button - lighter than the full-width .acc-btn */
+/* once an update is offered, the button says it - the check link is redundant
    and the three of them would not fit the footer on one line */
 body.has-update #upd-check {
   display: none;
@@ -979,7 +979,7 @@ body.live .live-only {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* switching re-reads that account's logs, which takes a beat — say so */
+/* switching re-reads that account's logs, which takes a beat - say so */
 .acc-item.loading .dot {
   background: var(--coral);
   animation: acc-pulse 0.9s ease-in-out infinite;
@@ -1065,7 +1065,7 @@ body.auth-on #acc-connected {
   display: flex;
 }
 /* the browser is already open on the login page: the button that opens it and
-   the pitch for connecting are both noise now — only the code field matters */
+   the pitch for connecting are both noise now - only the code field matters */
 body.awaiting #acc-connect,
 body.awaiting #acc-intro {
   display: none;
@@ -1087,8 +1087,8 @@ body.awaiting #acc-intro {
 
 /* limits: real meters when connected, a "connect" prompt otherwise */
 /* the connect prompt draws its own frame, so the rules on either side of it
-   would box a box. It is `.live` that decides whether it shows — being logged
-   in is not enough, the usage fetch has to have landed — so that is what these
+   would box a box. It is `.live` that decides whether it shows - being logged
+   in is not enough, the usage fetch has to have landed - so that is what these
    have to key off, not `.auth-on`. */
 body:not(.live) #statusline {
   border-bottom: 0;
@@ -1406,7 +1406,7 @@ body.collapsed #ring-pct {
 #ring-pct.high {
   color: #e0553f;
 }
-/* the ring already says it — no need to repeat it under the pet */
+/* the ring already says it - no need to repeat it under the pet */
 body.collapsed #mini-pct-row {
   display: none;
 }
@@ -1442,7 +1442,7 @@ body.collapsed #shadow {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease;
-}/* declutter the scene while configuring: mood marks AND activity props —
+}/* declutter the scene while configuring: mood marks AND activity props -
    the shortened stage only fits the pet and its gears */
 body.settings-open #zzz,
 body.settings-open #flames,
@@ -1844,7 +1844,7 @@ body.state-tired #status-text {
   text-overflow: ellipsis;
 }
 
-/* burn-rate projection — calm by default, warm when you'd run out first */
+/* burn-rate projection - calm by default, warm when you'd run out first */
 .sub.proj {
   margin-top: 2px;
   font-style: normal;
@@ -1927,7 +1927,7 @@ body.state-tired #status-text {
   opacity: 0.5;
   font-size: 9px;
 }
-/* the number is plain while there is nothing to worry about — colour is the
+/* the number is plain while there is nothing to worry about - colour is the
    warning, so spending it at 5% leaves nothing to say at 90% */
 .meter-top span:last-child {
   font-size: 12px;
@@ -1971,7 +1971,7 @@ body.state-tired #status-text {
   color: #ee705e;
 }
 
-/* by model / by project — collapsible sections */
+/* by model / by project - collapsible sections */
 .sec {
   border-top: 1px solid var(--hair);
   padding: 9px 0;
@@ -2064,7 +2064,7 @@ body.state-tired #status-text {
 .mrow:nth-child(3) .mname::before {
   background: #807769;
 }
-/* project names are paths, not four-letter families — the grid's first column
+/* project names are paths, not four-letter families - the grid's first column
    takes the slack and clips the rest, full name on the row's title attribute */
 .mrow .mbar {
   height: 3px;
@@ -2400,7 +2400,7 @@ body:has(#connections > .open) #conn-tiles {
   margin: 7px 0 8px;
 }
 /* keyboard focus: a soft inner glow in the brand coral rather than a detached
-   cream ring — still visible, but it reads as the control lighting up */
+   cream ring - still visible, but it reads as the control lighting up */
 #card button:focus-visible,
 #card input:focus-visible,
 #account-chip:focus-visible {

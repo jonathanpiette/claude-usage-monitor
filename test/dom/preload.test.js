@@ -2,7 +2,7 @@ import { describe, expect, mock, test } from 'bun:test'
 
 // preload.js is the whole contract between the renderer and main: every method
 // here maps to a channel main.js listens on, or one it sends. Small file, but a
-// typo in a channel name silently breaks a feature with no error anywhere — so
+// typo in a channel name silently breaks a feature with no error anywhere - so
 // the mapping is worth pinning down.
 const exposed = {}
 const sends = []

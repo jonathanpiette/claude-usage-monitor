@@ -1,6 +1,6 @@
 // ---- the pet's voice ----
 // Two channels. The bubble carries the meaning: a short remark, only on a
-// transition, and only when there's something specific to say — a pet that
+// transition, and only when there's something specific to say - a pet that
 // talks on a timer is Clippy. The sound carries the personality: chiptune
 // blips, one square-wave note per letter, Animal Crossing style. Oscillators
 // only, so no assets, no dependency, and no language baked into the sound.
@@ -39,7 +39,7 @@
       if (hz != null) {
         plan.push({ at: Math.round(t), hz: Math.round(hz * m.pitch), dur: Math.round(step * 0.6) })
         t += step
-      } else if (/[.,!?—:;]/.test(ch)) {
+      } else if (/[.,!?\u2014:;]/.test(ch)) {
         t += step * 1.5 // a breath on punctuation
       } else if (ch === ' ') {
         t += step * 0.4

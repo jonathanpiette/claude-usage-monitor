@@ -46,7 +46,7 @@ if (!arg) {
 } else if (arg === '--help' || arg === '-h') {
   console.log(
     [
-      'clauddy — a cute desktop pet that tracks your Claude Code usage',
+      'clauddy - a cute desktop pet that tracks your Claude Code usage',
       '',
       'Usage:',
       '  clauddy            launch the widget',
@@ -72,6 +72,6 @@ if (!arg) {
   console.log(`clauddy → ${arg}${kind ? ` ${kind}` : ''} (the running widget will react)`)
 } else {
   console.error(`clauddy: unknown command "${arg}"`)
-  console.error('try: fire, sleeping, working, tired, idle, poke, celebrate, auto — or --help')
+  console.error('try: fire, sleeping, working, tired, idle, poke, celebrate, auto - or --help')
   process.exit(1)
 }

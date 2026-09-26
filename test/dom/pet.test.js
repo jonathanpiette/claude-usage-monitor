@@ -4,8 +4,8 @@ import path from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 
 // pet.js is a plain <script>: it reads the real index.html by element id and
-// talks to the preload bridge on window.api. So the test builds that world —
-// the actual markup, a recording bridge, and stubbed animations — and then
+// talks to the preload bridge on window.api. So the test builds that world -
+// the actual markup, a recording bridge, and stubbed animations - and then
 // evaluates the script into it. Running against the real index.html means a
 // renamed element breaks a test instead of shipping a silently dead panel.
 //
@@ -201,7 +201,7 @@ describe('the pet reacts to what Claude is doing', () => {
     expect(el('status-text').textContent).toBe('maxed out')
   })
 
-  test('working outranks being on fire — the work is what you can see', () => {
+  test('working outranks being on fire - the work is what you can see', () => {
     live(95)
     pet.render(usage({ active: true, activity: 'running' }))
     expect(stateOf()).toBe('state-working')
@@ -304,8 +304,8 @@ describe('the usage panel', () => {
   test('shows a dash for the mini % until an account is connected', () => {
     api.handlers.onAuthState({ connected: false })
     pet.render(usage())
-    expect(el('mini-pct').textContent).toBe('—')
-    expect(el('ring-pct').textContent).toBe('—')
+    expect(el('mini-pct').textContent).toBe('-')
+    expect(el('ring-pct').textContent).toBe('-')
   })
 })
 
@@ -604,7 +604,7 @@ describe('the burn-rate line', () => {
     const now = Date.now()
     const MIN = 60_000
     live(25, 0, 3 * 3600_000)
-    pet.burn.reset() // live() re-renders, which samples — start clean
+    pet.burn.reset() // live() re-renders, which samples - start clean
     // 30%/h against a 3h reset: 75 points left → 2.5h, so the reset loses
     for (let m = 20; m >= 0; m -= 0.5) {
       pet.burn.note(20e6 - 30 * (20e6 / 25) * (m / 60), true, now - m * MIN)
@@ -856,7 +856,7 @@ describe('the voice', () => {
     expect(el('bubble').hidden).toBe(true)
   })
 
-  test('keeps a gap between remarks — unless the moment is a headline', () => {
+  test('keeps a gap between remarks - unless the moment is a headline', () => {
     expect(pet.say('one')).toBe(true)
     tick(60000)
     expect(pet.say('two')).toBe(false)
@@ -887,7 +887,7 @@ describe('the voice', () => {
     expect(pet.soundOn()).toBe(false)
   })
 
-  test('collapsed, the bubble moves above the pet — and back when expanded', () => {
+  test('collapsed, the bubble moves above the pet - and back when expanded', () => {
     document.body.classList.add('collapsed')
     expect(pet.say({ text: 'a whole sentence', short: 'up here' })).toBe(true)
     expect(bubble()).toBe('up here') // the mini face gets the glance
@@ -1101,7 +1101,7 @@ describe('pet-only companion and reset controls', () => {
     expect(el('glance-claude').classList.contains('urgent')).toBe(true)
     expect(el('glance-empty').hidden).toBe(true)
     api.handlers.onRealUsage(null)
-    expect(el('glance-claude-value').textContent).toBe('\u2014') // the empty-reading dash
+    expect(el('glance-claude-value').textContent).toBe('-') // the empty-reading dash
     api.handlers.onAuthState({ connected: false })
     expect(el('glance-claude').hidden).toBe(true)
     expect(el('glance-empty').hidden).toBe(false)

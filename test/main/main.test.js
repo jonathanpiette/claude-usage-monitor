@@ -4,13 +4,13 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-// main.js has no exports — it wires Electron up at import time. So we hand it a
+// main.js has no exports - it wires Electron up at import time. So we hand it a
 // fake `electron` and assert on what it *does*: the windows it opens, the
 // notifications it fires, the messages it sends the renderer.
 //
 // This lives in test/main/ and runs as its own `bun test` process: mocking
 // `electron`, `./usage` and `./auth` replaces those modules for the whole
-// runtime, and bun loads every test file before running any of them — so these
+// runtime, and bun loads every test file before running any of them - so these
 // mocks would otherwise reach the suites that test the real modules.
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'clauddy-main-'))
 process.env.CLAUDE_CONFIG_DIR = ROOT
@@ -201,7 +201,7 @@ mock.module('../../usage.js', () => ({
   setClaudeDir: () => {},
 }))
 // the real auth.js keeps its token in whatever dir it was last pointed at, and
-// "is this account connected?" is exactly "is there a token in its dir?" — the
+// "is this account connected?" is exactly "is there a token in its dir?" - the
 // mock has to model that, or every account looks logged in at once
 let authDir = DATA_DIR
 const tokenFile = () => path.join(authDir, 'auth.json')
@@ -278,7 +278,7 @@ await new Promise((r) => realSetTimeout(r, 10)) // the async usage/profile pushe
 // did-finish-load would re-register the debug-file watcher every time.
 const startup = [...sent]
 const startupOf = (channel) => [...startup].reverse().find((m) => m.channel === channel)?.payload
-// the recurring usage poll main.js installed — the tick, without the startup
+// the recurring usage poll main.js installed - the tick, without the startup
 const tick = () => timers.intervals.find((t) => t.ms === 4000).fn()
 
 afterAll(() => {
@@ -411,9 +411,9 @@ describe('threshold alerts', () => {
     await at(96, 81)
     const titles = notifications.map((n) => n.title)
     expect(titles).toContain('Session at 96%')
-    expect(titles).toContain('Session at 96% — almost out') // the top threshold
+    expect(titles).toContain('Session at 96% - almost out') // the top threshold
     expect(titles).toContain('Weekly usage at 81%')
-    expect(titles.some((t) => t.startsWith('Weekly usage at 81% —'))).toBe(false)
+    expect(titles.some((t) => t.startsWith('Weekly usage at 81% -'))).toBe(false)
     await at(0, 0)
   })
 
@@ -485,7 +485,7 @@ describe('threshold alerts', () => {
     // one rejection can be a rotated refresh token losing a race: still logged in
     expect(notifications).toEqual([])
     expect(authState.cleared).toBe(clearedBefore)
-    await timers.timeouts.at(-1).fn() // the retry, rejected too — now it is real
+    await timers.timeouts.at(-1).fn() // the retry, rejected too - now it is real
     await new Promise((r) => realSetTimeout(r, 5))
     expect(notifications.map((n) => n.title)).toContain('Clauddy lost access to your usage')
     authState.usageError = null
@@ -1075,7 +1075,7 @@ describe('accounts', () => {
   test('a slot nobody ever logged into is dropped when you leave it', () => {
     fire('accounts-add')
     const first = listed().active
-    // clicking "add" again must not leave the abandoned slot behind — that is
+    // clicking "add" again must not leave the abandoned slot behind - that is
     // how the list filled up with "Not connected yet" rows
     fire('accounts-add')
     const second = listed().active

@@ -20,7 +20,7 @@ const SPRITE = [
   const C = 10
   // Each pixel is its own <rect>, so neighbours share an edge. Under the mood
   // animations the sprite is scaled by fractions, that edge lands between device
-  // pixels, and the card shows through as a hairline grid — crispEdges cannot
+  // pixels, and the card shows through as a hairline grid - crispEdges cannot
   // help, it rounds in local space, before the transform. So a cell is grown to
   // overlap the neighbour it actually has: same fill, invisible seam, and the
   // silhouette stays exact because edge cells are left alone.
@@ -119,7 +119,7 @@ const SPRITE = [
 })()
 
 // helpers
-// labels come from log fields and directory names — neither is ours to trust
+// labels come from log fields and directory names - neither is ours to trust
 function esc(s) {
   return String(s).replace(
     /[&<>"']/g,
@@ -153,7 +153,7 @@ function fmtResetClock(ms) {
   const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
   return ms >= 86400000 ? `${at.toLocaleDateString([], { weekday: 'short' })} ${time}` : time
 }
-// "2h 22m (14:35)" — countdown plus the clock time it lands on
+// "2h 22m (14:35)" - countdown plus the clock time it lands on
 function fmtResetIn(ms) {
   const at = fmtResetClock(ms)
   return at ? `${fmtReset(ms)} (${at})` : fmtReset(ms)
@@ -169,7 +169,7 @@ function setState(name) {
   b.classList.add(`state-${name}`)
 }
 
-// coins (Claude "eating" tokens) — arc in, spin, get gulped with a crumb pop
+// coins (Claude "eating" tokens) - arc in, spin, get gulped with a crumb pop
 const W = 86
 const H = 77
 const MOUTH_X = 43
@@ -352,7 +352,7 @@ function renderHeat(days) {
   })
 }
 
-// ranked bar list — shared by the model and project panels
+// ranked bar list - shared by the model and project panels
 //
 // The name column is one width for the whole list, never per row: the bars are
 // only comparable if every track starts and ends at the same x. So it is sized
@@ -383,7 +383,7 @@ function renderBars(boxId, list, limit) {
 
 // measure the labels unconstrained, then lock the column to the widest one
 
-// per-model weekly limits (e.g. "Fable" on Max) — one meter each, in the same
+// per-model weekly limits (e.g. "Fable" on Max) - one meter each, in the same
 // shape as the all-models one. The token count pairs the limit with the local
 // log totals for that model family (a "Fable" limit covers every Fable row).
 function renderScoped(list, byModel) {
@@ -417,7 +417,7 @@ function renderModels(list) {
   renderBars('bymodel-list', list, 4)
 }
 
-// by project (7 days) — usage.js already folds everything past the top few
+// by project (7 days) - usage.js already folds everything past the top few
 // into a single `other` row, so whatever arrives here is meant to be drawn
 function renderProjects(list) {
   renderBars('byproject-list', list, 6)
@@ -571,7 +571,7 @@ function markToday(key) {
   } catch {}
 }
 
-// what the pet has noticed so far — the transitions are all relative to it
+// what the pet has noticed so far - the transitions are all relative to it
 const AWAY_MS = 2 * 3600000
 const STREAK_MS = 90 * 60000
 const STREAK_GAP_MS = 10 * 60000
@@ -584,7 +584,7 @@ let lastWorkAt = 0
 let streakTold = false
 
 // what the current Claude window has been like, for the recap when it closes
-// (#31). The peak is the session's tokens just before the rollover — after it
+// (#31). The peak is the session's tokens just before the rollover - after it
 // the counter starts over. Only the time the pet actually watched counts.
 const TALLY_GAP_MS = 15000 // a longer gap is the machine asleep, not work
 let tally = { peak: 0, activeMs: 0, acts: {}, at: 0 }
@@ -658,7 +658,7 @@ function listen(before, st, { liveOn, sp, sessReset, proj }) {
   if (record && !toldToday('clauddy.record') && say(record, { mood })) markToday('clauddy.record')
 }
 
-// `./pet say <kind>` previews one remark — real numbers where there are some,
+// `./pet say <kind>` previews one remark - real numbers where there are some,
 // plausible ones where the moment hasn't happened
 function sampleLine(kind) {
   const days = lastData?.days30?.length ? [...lastData.days30] : new Array(30).fill(0)
@@ -700,7 +700,7 @@ function paintMute() {
   const muted = mutedNow()
   btn.classList.toggle('muted', muted)
   btn.title = muted
-    ? `Muted until ${new Date(currentConfig.soundMutedUntil).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} — click to unmute`
+    ? `Muted until ${new Date(currentConfig.soundMutedUntil).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - click to unmute`
     : 'Mute the voice for 1 hour'
   clearTimeout(unmuteTimer)
   if (muted) unmuteTimer = setTimeout(paintMute, currentConfig.soundMutedUntil - Date.now() + 50)
@@ -724,7 +724,7 @@ function sessionHeat(from) {
   return { pct: Math.max(0, pct), providers: pct >= from ? ['claude'] : [] }
 }
 
-const pctText = (v) => (v == null ? '—' : `${Math.round(v)}%`)
+const pctText = (v) => (v == null ? '-' : `${Math.round(v)}%`)
 const warnAt = () => Math.min(...(currentConfig.alertThresholds || [80, 95]))
 
 // ---- companion: pet-only size, reset reminders, and activity reactions -------
@@ -1015,7 +1015,7 @@ function paint() {
   el('session-pct').textContent = pctText(liveOn ? sessPct : 0)
   setLevel(el('session-pct'), liveOn ? sp : 0)
   const mini = el('mini-pct')
-  mini.textContent = liveOn ? pctText(sessPct) : '—'
+  mini.textContent = liveOn ? pctText(sessPct) : '-'
   mini.classList.toggle('high', liveOn && sp >= 80)
   // the collapsed ring: how much of the session is already spent
   const rf = el('ring-fill')
@@ -1057,7 +1057,7 @@ function paint() {
   renderModels(d.byModel || [])
   renderProjects(d.byProject || [])
   renderHeat(d.days30 || [])
-  el('month-total').textContent = d.monthTokens == null ? '—' : `${fmtTokens(d.monthTokens)} tokens`
+  el('month-total').textContent = d.monthTokens == null ? '-' : `${fmtTokens(d.monthTokens)} tokens`
   paintChip()
 
   // compact eats at Claude's pace only while Claude is one of the workers
@@ -1087,7 +1087,7 @@ function fitSize() {
     const petOnly = document.body.classList.contains('pet-only')
     const w = (petOnly ? 168 : collapsed ? 192 : 304) * zoom
     // offsetHeight never reflects a CSS zoom applied to an ancestor (confirmed
-    // empirically against this Electron build) — so measure the unzoomed content
+    // empirically against this Electron build) - so measure the unzoomed content
     // height, then scale the whole thing (content + margin) ourselves
     const h = (el('card').offsetHeight + 24) * zoom // 12px margin top + bottom
     if (Math.abs(h - lastH) > 2 || w !== lastW) {
@@ -1099,7 +1099,7 @@ function fitSize() {
 }
 
 // widget scale, applied as a CSS zoom (not transform) so offsetWidth/Height
-// keep reflecting it — offsetHeight is a layout px, so it must be measured as one
+// keep reflecting it - offsetHeight is a layout px, so it must be measured as one
 function applyZoom(z) {
   document.body.style.zoom = (z || 100) / 100
 }
@@ -1171,7 +1171,7 @@ function showProfile(p) {
 }
 
 // The chip is also the account switcher, so it must not vanish just because the
-// profile fetch failed — that would strand the user on one account until a
+// profile fetch failed - that would strand the user on one account until a
 // restart. The label main stored for the active account is the same email, so
 // it stands in until the profile lands.
 function paintChip() {
@@ -1325,7 +1325,7 @@ el('account-chip').addEventListener('click', (e) => {
   e.stopPropagation()
   toggleAccountMenu()
 })
-// clicking anywhere else — the pet, the gear, another app — puts it away
+// clicking anywhere else - the pet, the gear, another app - puts it away
 el('acc-backdrop').addEventListener('mousedown', closeAccountMenu)
 document.addEventListener('click', (e) => {
   if (!el('acc-menu').hidden && !el('acc-menu').contains(e.target)) closeAccountMenu()
@@ -1336,7 +1336,7 @@ document.addEventListener('keydown', (e) => {
 })
 
 // paint the pending state from the click itself rather than waiting for main to
-// answer — the answer is exactly what takes a moment
+// answer - the answer is exactly what takes a moment
 function switchAccount(id) {
   if (lastAccounts?.busy) return
   endLogin() // the code from the account we're leaving is no good here
@@ -1375,7 +1375,7 @@ window.api.onAuthResult((r) => {
   if (r?.ok) {
     endLogin()
     // logging in is done: land back on the home panel, where the fresh live
-    // meters show up under a short-lived cheer — and the pet throws confetti
+    // meters show up under a short-lived cheer - and the pet throws confetti
     document.body.classList.remove('settings-open')
     clearSaveDirty()
     el('home-success').hidden = false
@@ -1390,7 +1390,7 @@ window.api.onAuthResult((r) => {
     document.body.classList.remove('awaiting')
     const e = r?.error || ''
     el('acc-msg').textContent = /429|rate_limit/i.test(e)
-      ? 'Rate limited by Anthropic — wait a few minutes, then try once with a fresh code.'
+      ? 'Rate limited by Anthropic - wait a few minutes, then try once with a fresh code.'
       : `Failed: ${e || 'check the code and try again'}`
   }
   fitSize()
@@ -1416,7 +1416,7 @@ el('details-toggle').addEventListener('click', () => {
   } catch {}
 })
 
-// collapsible panel sections — the widget is a desktop pet, not a dashboard, so
+// collapsible panel sections - the widget is a desktop pet, not a dashboard, so
 // each breakdown can be folded away and the choice is remembered per machine
 const SEC_KEY = 'clauddy.folded'
 
@@ -1431,18 +1431,18 @@ function readFolded() {
 function toggleSection(id, force) {
   const sec = el(id)
   if (!sec) return
-  // `folded`, not `collapsed` — the body already uses that word for the pet
+  // `folded`, not `collapsed` - the body already uses that word for the pet
   const folded = force !== undefined ? force : !sec.classList.contains('folded')
   sec.classList.toggle('folded', folded)
   const head = sec.querySelector('.sec-head')
   if (head) head.setAttribute('aria-expanded', String(!folded))
-  // the card just changed height, and the next usage poll is seconds away —
+  // the card just changed height, and the next usage poll is seconds away -
   // without this the window keeps its old size and clips the content. The body
   // slides now rather than snapping, so size it again once that settles.
   fitSize()
   // ...and again when the slide lands. The listener has to check what finished:
   // the bar widths inside the section transition too, and those events bubble up
-  // here — resizing on one of them catches the card mid-slide.
+  // here - resizing on one of them catches the card mid-slide.
   const body = sec.querySelector('.sec-body')
   if (!body) return
   const settle = (e) => {
@@ -1463,7 +1463,7 @@ for (const head of document.querySelectorAll('.sec-head')) {
     try {
       localStorage.setItem(SEC_KEY, JSON.stringify([...open]))
     } catch {
-      // private mode or a wiped profile — the panel just forgets, which is fine
+      // private mode or a wiped profile - the panel just forgets, which is fine
     }
   })
 }
@@ -1475,7 +1475,7 @@ el('usage').addEventListener('click', () => window.api.openUsage())
 
 // account login (browser flow)
 el('acc-connect').addEventListener('click', () => window.api.authStart())
-// main opened the browser — the only thing left to do is paste the code back,
+// main opened the browser - the only thing left to do is paste the code back,
 // so the panel narrows to exactly that
 window.api.onAuthPending(() => {
   // the login can start from the account menu, with the panel closed: the code
@@ -1775,7 +1775,7 @@ document.body.classList.add('greet')
 setTimeout(() => document.body.classList.remove('greet'), 1200)
 
 // Loaded as a plain <script> by the widget, where `module` doesn't exist. The
-// tests import it instead, against a happy-dom document and a stub bridge —
+// tests import it instead, against a happy-dom document and a stub bridge -
 // same dual export as burn.js.
 if (typeof module === 'object' && module.exports) {
   module.exports = {

@@ -147,7 +147,7 @@ describe('connection state', () => {
 
   test('a token that cannot be read still counts as connected', async () => {
     auth.clear()
-    // a read that fails for anything but "no such file" — the shape of a disk
+    // a read that fails for anything but "no such file" - the shape of a disk
     // that is not up yet after a sleep. It must not read as a logout.
     fs.mkdirSync(TOKEN_PATH, { recursive: true })
     expect(auth.isConnected()).toBe(true)
@@ -282,7 +282,7 @@ describe('token refresh', () => {
   test.each([
     [400, 401, 'a rejected grant is a dead session'],
     [403, 401, 'a forbidden grant is a dead session'],
-    [429, 429, 'throttling is transient — retry, do not log out'],
+    [429, 429, 'throttling is transient - retry, do not log out'],
     [500, 500, 'a server error is transient'],
   ])('refresh %i surfaces as %i (%s)', async (got, want) => {
     seedToken(EXPIRED)

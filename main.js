@@ -58,7 +58,7 @@ let trayBounds = null // last known tray icon rect, to anchor the popover
 let lastBlurHide = 0 // debounce: ignore the tray click that dismissed the popover
 let sessionPct = null // authoritative session % shown in the tray title
 let realUsageAt = 0
-let realUsage = null // last OAuth usage payload — the % alerts trust when logged in
+let realUsage = null // last OAuth usage payload - the % alerts trust when logged in
 let lastProgrammaticMove = 0 // ignore the 'moved' event our own setPosition triggers
 let displayChanging = 0 // ignore OS window-shuffles while a display (dis)connects
 
@@ -258,7 +258,7 @@ function alertScopes(config, scopes) {
           dirty = true
           const urgent = t === top
           notify(
-            `${label} at ${Math.round(pct)}%${urgent ? ' — almost out' : ''}`,
+            `${label} at ${Math.round(pct)}%${urgent ? ' - almost out' : ''}`,
             resetLine(resetMs, session),
             { silent: !urgent }, // 80% is a heads-up; the last threshold earns a sound
           )
@@ -294,7 +294,7 @@ function checkScopedAlerts(config, u) {
   )
 }
 
-// "you can work again" — only worth saying to someone who was actually near the
+// "you can work again" - only worth saying to someone who was actually near the
 // ceiling, so a window flipping at 20% stays silent
 const RESET_FROM = 80
 const RESET_TO = 5
@@ -324,8 +324,8 @@ function alertAuthLost(config) {
 
 // ---- accounts ----------------------------------------------------------------
 // One widget, several Claude subscriptions. Switching rebinds the token store
-// (auth), the log dir (usage) and the alert state — everything that is "whose
-// usage is this" — while the window itself (position, mode, zoom, settings)
+// (auth), the log dir (usage) and the alert state - everything that is "whose
+// usage is this" - while the window itself (position, mode, zoom, settings)
 // stays global, because there is only one pet.
 function applyAccount(acc) {
   const dir = accounts.dataDirOf(acc.id)
@@ -391,9 +391,9 @@ function switchAccount(id) {
 }
 
 // a slot only earns its place by holding a login. One that was never connected
-// — the browser flow abandoned, or "add" clicked twice — is dropped the moment
+// - the browser flow abandoned, or "add" clicked twice - is dropped the moment
 // we leave it, so the list can't fill up with "Not connected yet".
-// asked of any account, not just the active one — auth only knows about the
+// asked of any account, not just the active one - auth only knows about the
 // dir it is currently pointed at
 function hasToken(id) {
   return fs.existsSync(path.join(accounts.dataDirOf(id), 'auth.json'))
@@ -454,7 +454,7 @@ function createWindow() {
     y: workAreaSize.height - H - 24,
     frame: false,
     transparent: true,
-    backgroundColor: '#00000000', // fully transparent — Windows needs this or the window paints black
+    backgroundColor: '#00000000', // fully transparent - Windows needs this or the window paints black
     resizable: false,
     show: false, // applyMode() reveals it (floating) or keeps it a hidden popover (menubar)
     alwaysOnTop: true,
@@ -484,7 +484,7 @@ function createWindow() {
     }
   })
 
-  // remember where the user parks the widget — but not the moves we make
+  // remember where the user parks the widget - but not the moves we make
   // ourselves (resize re-anchoring) nor the ones the OS forces when a display
   // (dis)connects, so a monitor going dark never overwrites the saved spot
   win.on('moved', () => {
@@ -494,7 +494,7 @@ function createWindow() {
   })
 
   // when a monitor is unplugged/replugged (or its layout changes), put the
-  // floating widget back on the display the user parked it on — the OS dumps
+  // floating widget back on the display the user parked it on - the OS dumps
   // it on the primary display otherwise, and never moves it back on its own
   const onDisplayChange = () => {
     displayChanging = Date.now()
@@ -539,7 +539,7 @@ function createWindow() {
 // ---- menu-bar (tray) mode ----------------------------------------------------
 // Floating mode: the widget lives bottom-right, always visible. Menu-bar mode:
 // the same window becomes a popover shown under a tray icon on click. Switching
-// is live — no relaunch — so the Settings toggle applies immediately.
+// is live - no relaunch - so the Settings toggle applies immediately.
 function applyMode(mode) {
   const next = mode === 'menubar' ? 'menubar' : 'floating'
   const changed = next !== currentMode
@@ -562,7 +562,7 @@ function ensureTray() {
   if (tray) return
   // macOS recolors a "template" (black+alpha) image for the light/dark menu
   // bar; Linux/Windows tray icons get no such recoloring, so they get the
-  // pre-colored terracotta variant instead — a plain black icon disappears
+  // pre-colored terracotta variant instead - a plain black icon disappears
   // on dark panels (e.g. Linux Mint's default Cinnamon taskbar).
   const isMac = process.platform === 'darwin'
   const iconFile = isMac ? 'trayTemplate.png' : 'trayColor.png'
@@ -641,8 +641,8 @@ function moveWindow(x, y) {
   win.setPosition(Math.round(x), Math.round(y))
 }
 
-// persist the widget's anchor — its bottom-right corner, since the window's
-// size changes as the pet animates — so it can be restored later
+// persist the widget's anchor - its bottom-right corner, since the window's
+// size changes as the pet animates - so it can be restored later
 function saveWindowState() {
   if (currentMode !== 'floating' || !win || win.isDestroyed()) return
   const b = win.getBounds()
@@ -703,13 +703,13 @@ function updateTray() {
   if (!tray) return
   if (sessionPct == null) {
     if (process.platform === 'darwin') tray.setTitle('')
-    tray.setToolTip('Clauddy — connect your account for live %')
+    tray.setToolTip('Clauddy - connect your account for live %')
     return
   }
   const pct = Math.round(sessionPct)
   const hot = pct >= (config?.fireThreshold ?? 90)
   if (process.platform === 'darwin') tray.setTitle(hot ? ` ${pct}% 🔥` : ` ${pct}%`)
-  tray.setToolTip(`Clauddy — session ${pct}%`)
+  tray.setToolTip(`Clauddy - session ${pct}%`)
 }
 
 // send real usage to the renderer and refresh the tray title in one place
@@ -786,13 +786,13 @@ function watchDebug() {
 // ---- real usage via OAuth (authoritative %), polled slowly with 429 backoff ----
 let usageTimer = null
 let usageBackoff = 5 * 60 * 1000
-let authFails = 0 // consecutive 401s — see pollUsage
+let authFails = 0 // consecutive 401s - see pollUsage
 let lastPollAt = 0
 
 // The authoritative % only moves when tokens are actually spent, and the local
 // logs show that within a tick. Polling off that beats a faster clock: it
 // answers while the user is working and asks for nothing while they are not.
-// The floor is what bounds the cost — never more than one call per 90s, well
+// The floor is what bounds the cost - never more than one call per 90s, well
 // under what a fixed one-minute poll would spend.
 const POLL_FLOOR_MS = 90 * 1000
 let lastSeenTokens = null
@@ -860,8 +860,8 @@ function startUsagePoll() {
 }
 
 // Waking up: the poll timer was frozen through the sleep, so the numbers on
-// screen are as old as the nap. Re-state what we know — a read that failed on
-// the way down would otherwise leave a stale "log in" panel up — and poll
+// screen are as old as the nap. Re-state what we know - a read that failed on
+// the way down would otherwise leave a stale "log in" panel up - and poll
 // again, after a beat, since the network is rarely back the instant we are.
 function onResume() {
   if (!auth.isConnected()) return
@@ -883,7 +883,7 @@ async function sendProfile(tries = 0) {
   const id = accounts.activeId()
   try {
     const p = await auth.fetchProfile()
-    if (id !== accounts.activeId()) return // switched under us — this is stale
+    if (id !== accounts.activeId()) return // switched under us - this is stale
     if (p?.email) {
       accounts.label(id, p.email) // a better name than "acct-xyz"
       sendAccounts()
@@ -891,8 +891,8 @@ async function sendProfile(tries = 0) {
     if (win && !win.isDestroyed()) win.webContents.send('profile', p)
     profileShown = true
   } catch {
-    // a rate limit or a blip would otherwise hide the chip — and with it the
-    // account switcher — until the app is restarted, so keep trying for a while
+    // a rate limit or a blip would otherwise hide the chip - and with it the
+    // account switcher - until the app is restarted, so keep trying for a while
     if (tries >= 4) return
     profileTimer = setTimeout(
       () => {
@@ -929,7 +929,7 @@ ipcMain.on('auth-code', async (_e, code) => {
       pushRealUsage(u)
     } catch (e) {
       if (e && e.status === 429) {
-        // token is fine, the usage endpoint is just throttled — keep it and retry later
+        // token is fine, the usage endpoint is just throttled - keep it and retry later
         ok()
       } else {
         throw e
@@ -1038,17 +1038,17 @@ ipcMain.on('do-update', () => {
 ipcMain.on('quit', () => app.quit())
 
 // Electron's login-item API only covers macOS (SMAppService) and Windows (the
-// registry Run key) — @platform darwin,win32 in electron.d.ts, a no-op on
+// registry Run key) - @platform darwin,win32 in electron.d.ts, a no-op on
 // Linux. The real "start with the system" mechanism there is the XDG
 // Autostart spec: a .desktop file in ~/.config/autostart, read by every major
 // desktop environment's session manager at login (GNOME, KDE, XFCE, Cinnamon,
-// MATE) — same role as the registry key or SMAppService, just file-based.
+// MATE) - same role as the registry key or SMAppService, just file-based.
 function enableLinuxAutostart() {
   const exec = process.env.APPIMAGE || process.execPath
   const autostartDir = path.join(os.homedir(), '.config', 'autostart')
   const desktopFile = path.join(autostartDir, 'clauddy.desktop')
   // AppImage isn't registered in the system's hicolor icon theme, so a bare
-  // "Icon=clauddy" name won't resolve — copy the icon to a path that outlives
+  // "Icon=clauddy" name won't resolve - copy the icon to a path that outlives
   // the AppImage's temp mount and reference it absolutely instead.
   const iconFile = path.join(DATA_DIR, 'icon.png')
   fs.mkdirSync(DATA_DIR, { recursive: true })

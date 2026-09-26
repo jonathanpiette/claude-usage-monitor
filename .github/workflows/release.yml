@@ -52,7 +52,7 @@ jobs:
           version=$(sed -nE 's/.*next release version is ([0-9]+\.[0-9]+\.[0-9]+.*)$/\1/p' release-dry-run.log | tail -n1)
           echo "version=$version" >> "$GITHUB_OUTPUT"
           if [ -z "$version" ]; then
-            echo "No release due — skipping build and publish."
+            echo "No release due - skipping build and publish."
           else
             echo "Next version: $version"
           fi
@@ -90,7 +90,7 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      # electron-builder names artifacts from package.json — stamp the version
+      # electron-builder names artifacts from package.json - stamp the version
       # semantic-release is about to publish so the filenames match the release.
       - name: Stamp version
         run: node scripts/set-version.js ${{ needs.version.outputs.version }}
