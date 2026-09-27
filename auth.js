@@ -10,7 +10,10 @@ const AUTHORIZE = 'https://claude.ai/oauth/authorize'
 const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token'
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
 const PROFILE_URL = 'https://api.anthropic.com/api/oauth/profile'
-const SCOPE = 'org:create_api_key user:profile user:inference'
+// Read-only: usage and profile need nothing more. The upstream app also asked
+// for `user:inference` and `org:create_api_key`, which would let this token
+// spend the subscription or mint API keys.
+const SCOPE = 'user:profile'
 const UA = 'claude-cli/2.1.181 (external, cli)'
 // when CLAUDE_CONFIG_DIR is set (e.g. via direnv for multi-account setups),
 // keep the widget's data alongside that account's Claude config
@@ -26,9 +29,9 @@ const b64url = (buf) =>
 
 let tokens = null // { access_token, refresh_token, expires_at }
 let pending = null // { verifier, state }
-let profile = null // { email, name, plan } — cached account identity
+let profile = null // { email, name, plan } - cached account identity
 
-// point the module at another account's dir — the cached token and profile
+// point the module at another account's dir - the cached token and profile
 // belong to the previous one, so both are dropped
 function setDataDir(dir) {
   tokenPath = path.join(dir || DATA_DIR, 'auth.json')
@@ -39,7 +42,7 @@ function setDataDir(dir) {
 }
 
 // Set when the file itself could not be read for a reason other than "it is not
-// there" — a disk still waking up, say. That must not read as a logout, or the
+// there" - a disk still waking up, say. That must not read as a logout, or the
 // widget asks for a login it doesn't need and every account looks gone. A file
 // we did read but cannot parse is a different matter: that one really is dead.
 let unreadable = false
@@ -140,7 +143,7 @@ async function complete(pasted) {
 }
 
 // Usage and profile both ask for a valid token at once. Two refreshes would
-// rotate the refresh token twice, and the loser's grant comes back rejected —
+// rotate the refresh token twice, and the loser's grant comes back rejected -
 // so callers share the one in flight.
 let refreshing = null
 function refresh() {
@@ -161,7 +164,7 @@ async function doRefresh() {
   })
   if (!res.ok) {
     // a rejected grant (expired/revoked refresh token) means the session is
-    // dead — surface it as 401 so callers clear the token and prompt login.
+    // dead - surface it as 401 so callers clear the token and prompt login.
     // transient failures (429, 5xx) keep their status so we retry, not logout.
     const dead = res.status === 400 || res.status === 403
     throw Object.assign(new Error('refresh failed'), { status: dead ? 401 : res.status })
@@ -220,7 +223,7 @@ function scopedWeeks(j) {
 }
 
 // What the endpoint says its own budget is. Undocumented, so we only ever read
-// it — nothing depends on it yet. Knowing the real numbers is what tells us how
+// it - nothing depends on it yet. Knowing the real numbers is what tells us how
 // close the activity poll's floor can get.
 let rateLimit = null
 function readRateLimit(res) {
@@ -230,7 +233,7 @@ function readRateLimit(res) {
       if (k.startsWith('anthropic-ratelimit-')) out[k.slice(20)] = v
     }
   } catch {
-    return // no headers to read — nothing here is worth failing a fetch over
+    return // no headers to read - nothing here is worth failing a fetch over
   }
   if (!Object.keys(out).length) return
   if (JSON.stringify(out) !== JSON.stringify(rateLimit)) console.log('usage rate limit', out)

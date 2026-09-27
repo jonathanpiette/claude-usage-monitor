@@ -4,13 +4,13 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-// main.js has no exports — it wires Electron up at import time. So we hand it a
+// main.js has no exports - it wires Electron up at import time. So we hand it a
 // fake `electron` and assert on what it *does*: the windows it opens, the
 // notifications it fires, the messages it sends the renderer.
 //
 // This lives in test/main/ and runs as its own `bun test` process: mocking
 // `electron`, `./usage` and `./auth` replaces those modules for the whole
-// runtime, and bun loads every test file before running any of them — so these
+// runtime, and bun loads every test file before running any of them - so these
 // mocks would otherwise reach the suites that test the real modules.
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'clauddy-main-'))
 process.env.CLAUDE_CONFIG_DIR = ROOT
@@ -201,33 +201,10 @@ mock.module('../../usage.js', () => ({
   setClaudeDir: () => {},
 }))
 // the real auth.js keeps its token in whatever dir it was last pointed at, and
-// "is this account connected?" is exactly "is there a token in its dir?" — the
+// "is this account connected?" is exactly "is there a token in its dir?" - the
 // mock has to model that, or every account looks logged in at once
 let authDir = DATA_DIR
 const tokenFile = () => path.join(authDir, 'auth.json')
-let codexResult = null
-let codexThrows = false
-mock.module('../../codex.js', () => ({
-  getCodexUsage: () => {
-    if (codexThrows) throw new Error('codex boom')
-    return codexResult
-  },
-}))
-
-let cursorResult = null
-let cursorThrows = false
-let cursorDetected = { found: true, plan: 'pro' }
-mock.module('../../cursor.js', () => ({
-  getCursorUsage: () => {
-    if (cursorThrows) throw new Error('cursor boom')
-    return cursorResult
-  },
-  detectCursor: () => {
-    if (cursorDetected instanceof Error) throw cursorDetected
-    return cursorDetected
-  },
-}))
-
 mock.module('../../auth.js', () => ({
   setDataDir: (dir) => {
     authDir = dir
@@ -263,11 +240,10 @@ mock.module('../../auth.js', () => ({
 }))
 mock.module('electron', () => electronMock)
 
-// MUST be stubbed: the macOS update path spawns `curl … | bash`, which would
-// download and run the real installer and replace the app on this machine.
-// main.js destructures `spawn` at import time, so the real module object is
-// patched here — before that import — rather than via mock.module, which does
-// not intercept node: builtins.
+// Stubbed as a tripwire: main.js must never spawn a process (the upstream
+// update path used to pipe `curl … | bash`). The real module object is patched
+// here, before main.js is imported, because mock.module does not intercept
+// node: builtins.
 const spawned = []
 childProcess.spawn = (cmd, args, opts) => {
   spawned.push({ cmd, args, opts })
@@ -302,7 +278,7 @@ await new Promise((r) => realSetTimeout(r, 10)) // the async usage/profile pushe
 // did-finish-load would re-register the debug-file watcher every time.
 const startup = [...sent]
 const startupOf = (channel) => [...startup].reverse().find((m) => m.channel === channel)?.payload
-// the recurring usage poll main.js installed — the tick, without the startup
+// the recurring usage poll main.js installed - the tick, without the startup
 const tick = () => timers.intervals.find((t) => t.ms === 4000).fn()
 
 afterAll(() => {
@@ -382,11 +358,18 @@ describe('startup', () => {
     usageThrows = null
   })
 
-  test('Codex stays off until enabled', () => {
-    codexResult = { active: true, session: { pct: 12 } }
+  test('tracks Claude only: no Codex or Cursor channels, config or pushes', () => {
+    for (const c of ['codex-detect', 'codex-enable', 'cursor-detect', 'cursor-enable']) {
+      expect(ipc.has(c)).toBe(false)
+    }
     tick()
-    expect(lastOf('codex')).toBeNull()
-    codexResult = null
+    const gone = ['codex', 'cursor', 'codex-detected', 'cursor-detected']
+    expect(sent.some((m) => gone.includes(m.channel))).toBe(false)
+    const cfg = startupOf('config')
+    expect(cfg).not.toHaveProperty('codex')
+    expect(cfg).not.toHaveProperty('cursor')
+    expect(lastOf('reminders')).not.toHaveProperty('codex')
+    expect(lastOf('reminders')).not.toHaveProperty('cursor')
   })
 })
 
@@ -428,9 +411,9 @@ describe('threshold alerts', () => {
     await at(96, 81)
     const titles = notifications.map((n) => n.title)
     expect(titles).toContain('Session at 96%')
-    expect(titles).toContain('Session at 96% — almost out') // the top threshold
+    expect(titles).toContain('Session at 96% - almost out') // the top threshold
     expect(titles).toContain('Weekly usage at 81%')
-    expect(titles.some((t) => t.startsWith('Weekly usage at 81% —'))).toBe(false)
+    expect(titles.some((t) => t.startsWith('Weekly usage at 81% -'))).toBe(false)
     await at(0, 0)
   })
 
@@ -502,7 +485,7 @@ describe('threshold alerts', () => {
     // one rejection can be a rotated refresh token losing a race: still logged in
     expect(notifications).toEqual([])
     expect(authState.cleared).toBe(clearedBefore)
-    await timers.timeouts.at(-1).fn() // the retry, rejected too — now it is real
+    await timers.timeouts.at(-1).fn() // the retry, rejected too - now it is real
     await new Promise((r) => realSetTimeout(r, 5))
     expect(notifications.map((n) => n.title)).toContain('Clauddy lost access to your usage')
     authState.usageError = null
@@ -728,6 +711,18 @@ describe('settings', () => {
     expect(opened[0]).toContain('claude.ai/settings/usage')
   })
 
+  test("the Usage arrow only ever opens Claude's page, whatever it is asked for", () => {
+    opened.length = 0
+    fire('open-usage', 'codex')
+    fire('open-usage', 'cursor')
+    fire('open-usage')
+    expect(opened).toEqual([
+      'https://claude.ai/settings/usage',
+      'https://claude.ai/settings/usage',
+      'https://claude.ai/settings/usage',
+    ])
+  })
+
   test('persists zoom and re-broadcasts it', () => {
     fire('save-config', { zoom: 150 })
     expect(JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')).zoom).toBe(150)
@@ -823,34 +818,24 @@ describe('update check', () => {
     globalThis.fetch = realFetch
   })
 
-  test('macOS runs the installer script and steps aside for it', () => {
-    const real = process.platform
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
-    try {
-      fire('do-update')
-      expect(lastOf('update-status')).toEqual({ state: 'updating' })
-      expect(spawned.at(-1).cmd).toBe('/bin/bash')
-      expect(spawned.at(-1).args[1]).toContain('install.sh')
-      expect(spawned.at(-1).opts.detached).toBe(true)
-      // it quits ~1.5s later so the installer can replace the running .app
-      expect(timers.timeouts.some((t) => t.fn)).toBe(true)
-    } finally {
-      Object.defineProperty(process, 'platform', { value: real, configurable: true })
-    }
-  })
-
-  test('non-macOS is sent to the releases page instead', () => {
-    const real = process.platform
-    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
-    try {
-      const before = spawned.length
-      fire('do-update')
-      expect(opened[0]).toContain('releases/latest')
-      expect(spawned.length).toBe(before) // never spawns a shell off macOS
-    } finally {
-      Object.defineProperty(process, 'platform', { value: real, configurable: true })
-    }
-  })
+  for (const platform of ['darwin', 'win32', 'linux']) {
+    test(`${platform}: opens this fork's releases page and never spawns a shell`, () => {
+      const real = process.platform
+      Object.defineProperty(process, 'platform', { value: platform, configurable: true })
+      try {
+        const before = spawned.length
+        const timeoutsBefore = timers.timeouts.length
+        fire('do-update')
+        expect(opened.at(-1)).toBe(
+          'https://github.com/jonathanpiette/claude-usage-monitor/releases/latest',
+        )
+        expect(spawned.length).toBe(before)
+        expect(timers.timeouts.length).toBe(timeoutsBefore) // no scheduled quit
+      } finally {
+        Object.defineProperty(process, 'platform', { value: real, configurable: true })
+      }
+    })
+  }
 })
 
 describe('polling off local activity', () => {
@@ -1090,7 +1075,7 @@ describe('accounts', () => {
   test('a slot nobody ever logged into is dropped when you leave it', () => {
     fire('accounts-add')
     const first = listed().active
-    // clicking "add" again must not leave the abandoned slot behind — that is
+    // clicking "add" again must not leave the abandoned slot behind - that is
     // how the list filled up with "Not connected yet" rows
     fire('accounts-add')
     const second = listed().active
@@ -1104,179 +1089,6 @@ describe('accounts', () => {
     sent.length = 0
     fire('accounts-switch', 'default')
     expect(lastOf('accounts')).toBeUndefined()
-  })
-})
-
-describe('codex', () => {
-  const cx = (over = {}) => ({
-    active: false,
-    limitsAt: Date.now(),
-    session: { pct: 12, resetMs: 3600000 },
-    weekly: { pct: 30, resetMs: 86400000 },
-    ...over,
-  })
-
-  test('detecting reports what it found, without enabling anything', () => {
-    fire('codex-detect')
-    expect(lastOf('codex-detected')).toHaveProperty('found')
-    expect(startupOf('config').codex).toBe(false)
-  })
-
-  test('enabling persists the choice and starts pushing Codex usage', () => {
-    codexResult = cx()
-    fire('codex-enable', true)
-    expect(JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')).codex.enabled).toBe(true)
-    expect(lastOf('config').codex).toBe(true)
-    expect(lastOf('codex').session.pct).toBe(12)
-  })
-
-  test('a Codex failure leaves Claude alone', () => {
-    const before = sent.filter((m) => m.channel === 'usage-error').length
-    const err = console.error
-    console.error = () => {}
-    codexThrows = true
-    tick()
-    codexThrows = false
-    console.error = err
-    expect(sent.filter((m) => m.channel === 'usage-error').length).toBe(before)
-    expect(lastOf('usage')).toBeTruthy()
-  })
-
-  test('alerts on Codex windows under their own names', () => {
-    notifications.length = 0
-    codexResult = cx({ session: { pct: 85, resetMs: 3600000 } })
-    tick()
-    expect(notifications.map((n) => n.title)).toContain('Codex session at 85%')
-    notifications.length = 0
-    tick()
-    expect(notifications.length).toBe(0)
-  })
-
-  test('the tray names both services', () => {
-    fire('save-config', { mode: 'menubar' })
-    // only macOS renders a title beside the icon: pin it, as the tray tests above do
-    const real = process.platform
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
-    try {
-      tick()
-    } finally {
-      Object.defineProperty(process, 'platform', { value: real, configurable: true })
-    }
-    expect(trayState.title).toContain('X 85%')
-    expect(trayState.tooltip).toContain('Codex session 85%')
-    trayState.handlers.get('right-click')()
-    const labels = trayState.menu.map((i) => i.label)
-    expect(labels).toContain('Open Codex usage')
-    trayState.menu.find((i) => i.label === 'Open Codex usage').click()
-    trayState.menu.find((i) => i.label === 'Open Claude usage').click()
-    expect(opened.slice(-2)).toEqual([
-      'https://chatgpt.com/usage#settings/Usage',
-      'https://claude.ai/settings/usage',
-    ])
-    fire('save-config', { mode: 'floating' })
-  })
-
-  test('the Usage arrow opens the page of the service on screen', () => {
-    opened.length = 0
-    fire('open-usage', 'codex')
-    fire('open-usage', 'claude')
-    fire('open-usage')
-    expect(opened).toEqual([
-      'https://chatgpt.com/usage#settings/Usage',
-      'https://claude.ai/settings/usage',
-      'https://claude.ai/settings/usage',
-    ])
-  })
-
-  test('disconnecting stops monitoring and clears it from the tray', () => {
-    fire('codex-enable', false)
-    expect(lastOf('config').codex).toBe(false)
-    expect(lastOf('codex')).toBeNull()
-    codexResult = null
-  })
-})
-
-describe('cursor', () => {
-  const cu = (over = {}) => ({
-    active: false,
-    limitsAt: Date.now(),
-    session: { pct: 20, resetMs: 10 * 86400000 },
-    api: { pct: 5, resetMs: 10 * 86400000 },
-    ...over,
-  })
-
-  test('stays off until enabled; detecting reports without enabling', () => {
-    cursorResult = cu()
-    tick()
-    expect(lastOf('cursor')).toBeNull()
-    fire('cursor-detect')
-    expect(lastOf('cursor-detected')).toEqual({ found: true, plan: 'pro' })
-    cursorDetected = new Error('locked')
-    fire('cursor-detect')
-    expect(lastOf('cursor-detected')).toEqual({ found: false, plan: null })
-    cursorDetected = { found: true, plan: 'pro' }
-    expect(startupOf('config').cursor).toBe(false)
-  })
-
-  test('enabling persists the choice and starts pushing Cursor usage', () => {
-    fire('cursor-enable', true)
-    expect(JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')).cursor.enabled).toBe(true)
-    expect(lastOf('config').cursor).toBe(true)
-    expect(lastOf('cursor').session.pct).toBe(20)
-  })
-
-  test('a Cursor failure leaves Claude alone', () => {
-    const before = sent.filter((m) => m.channel === 'usage-error').length
-    const err = console.error
-    console.error = () => {}
-    cursorThrows = true
-    tick()
-    cursorThrows = false
-    console.error = err
-    expect(sent.filter((m) => m.channel === 'usage-error').length).toBe(before)
-  })
-
-  test('alerts under its own names, with the reset as a date', () => {
-    notifications.length = 0
-    cursorResult = cu({ session: { pct: 96, resetMs: 10 * 86400000 } })
-    tick()
-    const alert = notifications.find((n) => n.title.startsWith('Cursor usage at 96%'))
-    expect(alert.body).toMatch(/^resets [A-Z][a-z]{2} \d+$/)
-    notifications.length = 0
-    tick()
-    expect(notifications.length).toBe(0)
-  })
-
-  test('the tray lists every service; the menu opens each usage page', () => {
-    fire('save-config', { mode: 'menubar' })
-    const real = process.platform
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
-    try {
-      tick()
-    } finally {
-      Object.defineProperty(process, 'platform', { value: real, configurable: true })
-    }
-    expect(trayState.title).toContain('Cu 96%')
-    expect(trayState.tooltip).toContain('Cursor usage 96%')
-    trayState.handlers.get('right-click')()
-    opened.length = 0
-    trayState.menu.find((i) => i.label === 'Open Cursor usage').click()
-    expect(opened).toEqual(['https://cursor.com/dashboard?tab=usage'])
-    fire('save-config', { mode: 'floating' })
-  })
-
-  test('a reset reminder arms from a fresh reading and cancels on disconnect', () => {
-    cursorResult = cu({ session: { pct: 97, resetMs: 10 * 86400000 } })
-    tick()
-    fire('set-reminder', 'cursor', true)
-    const r = lastOf('reminders').cursor
-    expect(r.label).toBe('Cursor')
-    expect(r.at).toBeGreaterThan(Date.now() + 9 * 86400000)
-    fire('cursor-enable', false)
-    expect(lastOf('reminders').cursor).toBeNull()
-    expect(lastOf('config').cursor).toBe(false)
-    expect(lastOf('cursor')).toBeNull()
-    cursorResult = null
   })
 })
 
@@ -1303,26 +1115,28 @@ describe('explicit reset reminders', () => {
     ).toContainEqual(watch)
     const count = sent.length
     fire('set-reminder', '__proto__', true)
+    fire('set-reminder', 'codex', true)
+    fire('set-reminder', 'cursor', true)
     fire('set-reminder', 'claude', 'yes')
     expect(sent).toHaveLength(count)
     fire('auth-logout')
     expect(lastOf('reminders').claude).toBeNull()
   })
-  test('stale Codex cannot be armed; an expired deadline is a reminder, not a claim of fresh budget', () => {
+  test('a stale reading cannot be armed; an expired deadline is a reminder, not a claim of fresh budget', async () => {
     const originalNow = Date.now
     let now = originalNow()
     Date.now = () => now
     try {
       fire('save-config', { alerts: false })
-      fire('codex-enable', true)
-      codexResult = { session: { pct: 98, resetMs: 1000 }, limitsAt: now - 3600000 }
-      tick()
-      fire('set-reminder', 'codex', true)
+      authState.usage = { session: { pct: 98, resetMs: 1000 }, week: { pct: 1 } }
+      await fire('auth-code', 'code#state')
+      now += 16 * 60000
+      fire('set-reminder', 'claude', true)
       expect(lastOf('reminders').error).toContain('fresh')
-      codexResult.limitsAt = now
-      tick()
-      fire('set-reminder', 'codex', true)
-      expect(lastOf('reminders').codex).not.toBeNull()
+      expect(lastOf('reminders').claude).toBeNull()
+      await fire('auth-code', 'code#state')
+      fire('set-reminder', 'claude', true)
+      expect(lastOf('reminders').claude).not.toBeNull()
       now += 2000
       tick()
       expect(lastOf('reminder-due').confirmed).toBe(false)
@@ -1330,10 +1144,7 @@ describe('explicit reset reminders', () => {
       const count = notifications.length
       tick()
       expect(notifications).toHaveLength(count)
-      expect(lastOf('reminders').codex).toBeNull()
-      fire('set-reminder', 'codex', true)
-      fire('codex-enable', false)
-      expect(lastOf('reminders').codex).toBeNull()
+      expect(lastOf('reminders').claude).toBeNull()
     } finally {
       Date.now = originalNow
     }

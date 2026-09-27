@@ -2,7 +2,7 @@
 #scene {
   transition: opacity 0.7s ease;
 }
-/* The night backdrop — dotted frame, stars and clouds — and the stage's own
+/* The night backdrop - dotted frame, stars and clouds - and the stage's own
    warm radial belong to every state, not just the idle one. Dimming #scene to
    0.12 during an activity and flattening #stage to solid black made the card
    look like a different widget depending on what Claude happened to be doing.
@@ -250,16 +250,13 @@ body.collapsed #flames {
 body.collapsed.state-stressed #compact-flames {
   display: block;
 }
-/* In the single-provider ring, flames overlap only the top of the head. */
-body.collapsed.state-stressed:not(.dual) #compact-flames {
+/* In the ring, flames overlap only the top of the head. */
+body.collapsed.state-stressed #compact-flames {
   z-index: 3;
   height: 40px;
 }
-body.collapsed.state-stressed:not(.dual) #pet {
+body.collapsed.state-stressed #pet {
   transform: translateY(-5px);
-}
-body.collapsed.dual.state-stressed #compact-flames {
-  top: -30px;
 }
 body.collapsed.state-stressed .compact-flame {
   transform-box: fill-box;
@@ -624,7 +621,7 @@ body.settings-open #compact-flames {
     animation: none !important;
   }
   body.state-stressed #claude {
-    /* biome-ignore lint/complexity/noImportantStyles: same — it has to beat the
+    /* biome-ignore lint/complexity/noImportantStyles: same - it has to beat the
        shiver declared on an equally specific selector later in this sheet. */
     animation: none !important;
   }

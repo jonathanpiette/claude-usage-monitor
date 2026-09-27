@@ -2,9 +2,6 @@ import { describe, expect, test } from 'bun:test'
 import {
   BASE_HZ,
   blipPlan,
-  codexFireLine,
-  codexMaxedLine,
-  codexResetLine,
   createBlipper,
   fireLine,
   greetingLine,
@@ -222,25 +219,5 @@ describe('remarks', () => {
       'Fresh window! The last one closed at 92%.',
     )
     expect(recapLine({ tokens: 0 }, fmt, dur).text).toBe('Fresh window! The last one closed at 0%.')
-  })
-
-  test('Codex lines always say whose they are', () => {
-    expect(codexFireLine(91.2, 3600_000, dur)).toEqual({
-      text: 'Codex is at 91% now. It resets in 60m.',
-      short: 'Codex at 91%!',
-    })
-    expect(codexFireLine(91, null, dur).text).toBe('Codex is at 91% now.')
-    expect(codexMaxedLine('14:35').text).toBe("Codex is maxed out. It's back at 14:35.")
-    expect(codexMaxedLine(null).text).toBe('Codex is maxed out.')
-    expect(codexResetLine(88)).toEqual({
-      text: 'Codex has a fresh window! The last one closed at 88%.',
-      short: 'Codex: fresh window!',
-    })
-    // Cursor borrows them, with its name and its month
-    expect(codexFireLine(95, null, dur, 'Cursor').text).toBe('Cursor is at 95% now.')
-    expect(codexMaxedLine(null, 'Cursor').text).toBe('Cursor is maxed out.')
-    expect(codexResetLine(90, 'Cursor', 'month').text).toBe(
-      'Cursor has a fresh month! The last one closed at 90%.',
-    )
   })
 })

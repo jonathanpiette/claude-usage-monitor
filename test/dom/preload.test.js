@@ -2,7 +2,7 @@ import { describe, expect, mock, test } from 'bun:test'
 
 // preload.js is the whole contract between the renderer and main: every method
 // here maps to a channel main.js listens on, or one it sends. Small file, but a
-// typo in a channel name silently breaks a feature with no error anywhere — so
+// typo in a channel name silently breaks a feature with no error anywhere - so
 // the mapping is worth pinning down.
 const exposed = {}
 const sends = []
@@ -31,9 +31,7 @@ describe('the preload bridge', () => {
 
   test.each([
     ['watchPetPointer', 'pet-pointer-watch', [true]],
-    ['setReminder', 'set-reminder', ['codex', true]],
-    ['cursorDetect', 'cursor-detect', []],
-    ['cursorEnable', 'cursor-enable', [true]],
+    ['setReminder', 'set-reminder', ['claude', true]],
     ['saveConfig', 'save-config', [{ alerts: false }]],
     ['resize', 'resize', [300, 400]],
     ['openUsage', 'open-usage', []],
@@ -61,10 +59,6 @@ describe('the preload bridge', () => {
     ['onError', 'usage-error'],
     ['onConfig', 'config'],
     ['onRealUsage', 'real-usage'],
-    ['onCodex', 'codex'],
-    ['onCodexDetected', 'codex-detected'],
-    ['onCursor', 'cursor'],
-    ['onCursorDetected', 'cursor-detected'],
     ['onAuthState', 'auth-state'],
     ['onProfile', 'profile'],
     ['onAuthResult', 'auth-result'],
@@ -112,14 +106,6 @@ describe('the preload bridge', () => {
         'onAuthPending',
         'onAuthResult',
         'onAuthState',
-        'codexDetect',
-        'codexEnable',
-        'onCodex',
-        'onCodexDetected',
-        'cursorDetect',
-        'cursorEnable',
-        'onCursor',
-        'onCursorDetected',
         'onConfig',
         'onDebugState',
         'onError',
@@ -134,5 +120,22 @@ describe('the preload bridge', () => {
         'saveConfig',
       ].sort(),
     )
+  })
+
+  test('no longer bridges anything Codex or Cursor', () => {
+    // those integrations read other apps' sessions and tokens: they must stay out
+    for (const gone of [
+      'codexDetect',
+      'codexEnable',
+      'onCodex',
+      'onCodexDetected',
+      'cursorDetect',
+      'cursorEnable',
+      'onCursor',
+      'onCursorDetected',
+    ]) {
+      expect(api).not.toHaveProperty(gone)
+    }
+    expect(Object.keys(api).filter((k) => /codex|cursor/i.test(k))).toEqual([])
   })
 })

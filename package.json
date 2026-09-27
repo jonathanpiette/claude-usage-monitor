@@ -14,8 +14,6 @@
     "usage.js",
     "auth.js",
     "accounts.js",
-    "codex.js",
-    "cursor.js",
     "reminders.js",
     "config.json",
     "renderer"
@@ -76,8 +74,6 @@
       "usage.js",
       "auth.js",
       "accounts.js",
-      "codex.js",
-      "cursor.js",
       "reminders.js",
       "config.json",
       "renderer/**",

@@ -4,8 +4,8 @@ import path from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 
 // pet.js is a plain <script>: it reads the real index.html by element id and
-// talks to the preload bridge on window.api. So the test builds that world —
-// the actual markup, a recording bridge, and stubbed animations — and then
+// talks to the preload bridge on window.api. So the test builds that world -
+// the actual markup, a recording bridge, and stubbed animations - and then
 // evaluates the script into it. Running against the real index.html means a
 // renamed element breaks a test instead of shipping a silently dead panel.
 //
@@ -43,10 +43,6 @@ for (const name of [
   'onError',
   'onConfig',
   'onRealUsage',
-  'onCodex',
-  'onCodexDetected',
-  'onCursor',
-  'onCursorDetected',
   'onAuthState',
   'onProfile',
   'onAuthResult',
@@ -67,10 +63,6 @@ for (const name of [
   'saveConfig',
   'resize',
   'openUsage',
-  'codexDetect',
-  'codexEnable',
-  'cursorDetect',
-  'cursorEnable',
   'authStart',
   'authCode',
   'authLogout',
@@ -209,7 +201,7 @@ describe('the pet reacts to what Claude is doing', () => {
     expect(el('status-text').textContent).toBe('maxed out')
   })
 
-  test('working outranks being on fire — the work is what you can see', () => {
+  test('working outranks being on fire - the work is what you can see', () => {
     live(95)
     pet.render(usage({ active: true, activity: 'running' }))
     expect(stateOf()).toBe('state-working')
@@ -312,8 +304,8 @@ describe('the usage panel', () => {
   test('shows a dash for the mini % until an account is connected', () => {
     api.handlers.onAuthState({ connected: false })
     pet.render(usage())
-    expect(el('mini-pct').textContent).toBe('—')
-    expect(el('ring-pct').textContent).toBe('—')
+    expect(el('mini-pct').textContent).toBe('-')
+    expect(el('ring-pct').textContent).toBe('-')
   })
 })
 
@@ -592,7 +584,7 @@ describe('talking back to main', () => {
 
   test('the usage button opens the official page', () => {
     el('usage').click()
-    expect(api.sent.some((s) => s.name === 'openUsage')).toBe(true)
+    expect(api.sent.find((s) => s.name === 'openUsage').args).toEqual([])
   })
 
   test('reports its content size so main can fit the window', () => {
@@ -612,7 +604,7 @@ describe('the burn-rate line', () => {
     const now = Date.now()
     const MIN = 60_000
     live(25, 0, 3 * 3600_000)
-    pet.burn.reset() // live() re-renders, which samples — start clean
+    pet.burn.reset() // live() re-renders, which samples - start clean
     // 30%/h against a 3h reset: 75 points left → 2.5h, so the reset loses
     for (let m = 20; m >= 0; m -= 0.5) {
       pet.burn.note(20e6 - 30 * (20e6 / 25) * (m / 60), true, now - m * MIN)
@@ -685,447 +677,126 @@ describe('the debug simulator', () => {
   })
 })
 
-describe('codex', () => {
-  const codex = (over = {}) => ({
-    active: false,
-    lastSeen: Date.now() - 60_000,
-    limitsAt: Date.now(),
-    model: 'gpt-6-astra',
-    plan: 'plus',
-    session: { pct: 72.4, resetMs: 3600000 },
-    weekly: { pct: 31, resetMs: 5 * 86400000 },
-    tokensToday: 900,
-    tokens5h: 1500,
-    tokensWeek: 2_000_000,
-    byModel: [{ label: 'gpt-6-astra', tokens: 2_000_000 }],
-    byProject: [{ label: 'clauddy', tokens: 2_000_000 }],
-    days30: new Array(30).fill(0).map((_, i) => (i === 29 ? 900 : 0)),
-    monthTokens: 900,
-    ...over,
-  })
-  const claudeLive = () => {
+describe('Claude is the only service', () => {
+  const claudeLive = (pct = 40) => {
     api.handlers.onAuthState({ connected: true })
     api.handlers.onRealUsage({
-      session: { pct: 40, resetMs: 3600000 },
+      session: { pct, resetMs: 3600000 },
       week: { pct: 20, resetMs: 86400000 },
       scoped: [],
     })
   }
-  const setConfig = (on) => api.handlers.onConfig({ alertThresholds: [80, 95], codex: on })
-  beforeEach(claudeLive)
-
-  test('without Codex enabled the panel is the classic one', () => {
+  beforeEach(() => {
     claudeLive()
-    setConfig(false)
     pet.render(usage())
-    api.handlers.onCodex(codex())
-    expect(document.body.classList.contains('dual')).toBe(false)
-    expect(document.body.classList.contains('view-codex')).toBe(false)
+  })
+
+  test('no Codex or Cursor markup is left in the page', () => {
+    for (const id of [
+      'harness-tabs',
+      'tab-claude',
+      'tab-codex',
+      'tab-cursor',
+      'mini-dual',
+      'mini-reset',
+      'glance-codex',
+      'glance-cursor',
+      'conn-codex',
+      'conn-cursor',
+      'codex-settings',
+      'cursor-settings',
+      'logo-openai',
+      'logo-cursor',
+    ]) {
+      expect(el(id)).toBeNull()
+    }
+    expect(document.querySelector('[data-provider="codex"], [data-provider="cursor"]')).toBeNull()
+    expect(document.querySelector('.mini-source')).toBeNull()
+  })
+
+  test('the panel is one labelled region, whatever an old config still says', () => {
+    api.handlers.onConfig({ alertThresholds: [80, 95], codex: true, cursor: true })
+    pet.render(usage())
+    expect(el('service-panel').tagName).toBe('SECTION')
+    expect(el('service-panel').getAttribute('aria-label')).toBe('Claude usage')
+    for (const c of ['dual', 'trio', 'view-codex', 'view-cursor', 'codex-on', 'cursor-on']) {
+      expect(document.body.classList.contains(c)).toBe(false)
+    }
     expect(el('session-pct').textContent).toBe('40%')
+    expect(el('session-label').textContent).toBe('current session')
+    expect(el('week-label').textContent).toBe('weekly · all models')
+    api.handlers.onConfig({ alertThresholds: [80, 95] })
   })
 
-  test('both services: tabs with each session %, Claude on screen', () => {
-    pet.pickProvider('claude')
-    setConfig(true)
-    api.handlers.onCodex(codex())
-    expect(document.body.classList.contains('dual')).toBe(true)
-    expect(el('tab-claude-value').textContent).toBe('40%')
-    expect(el('tab-codex-value').textContent).toBe('72%')
-    expect(el('tab-claude').getAttribute('aria-selected')).toBe('true')
-    expect(el('session-pct').textContent).toBe('40%')
-    expect(el('mini-codex-value').textContent).toBe('72%')
-  })
-
-  test('a Codex window near the limit flags its tab without taking focus', () => {
-    api.handlers.onCodex(codex({ weekly: { pct: 90, resetMs: 1000 } }))
-    expect(el('tab-codex').classList.contains('urgent')).toBe(true)
-    expect(el('tab-codex').querySelector('.tab-alert').hidden).toBe(false)
-    expect(el('tab-claude').getAttribute('aria-selected')).toBe('true')
-  })
-
-  test('the Codex tab swaps the whole panel', () => {
-    api.handlers.onCodex(codex())
-    el('tab-codex').click()
-    expect(document.body.classList.contains('view-codex')).toBe(true)
-    expect(el('session-pct').textContent).toBe('72%')
-    expect(el('session-sub').textContent).toContain('1.5k tokens')
-    expect(el('week-pct').textContent).toBe('31%')
-    expect(el('ac-email').textContent).toBe('Codex')
-    expect(el('ac-plan').textContent).toBe('plus')
-    expect(el('bymodel-list').textContent).toContain('gpt-6-astra')
-    expect(el('byproject-list').textContent).toContain('clauddy')
-    expect(el('status-text').textContent).toBe('idle')
-    expect(el('rate').textContent).toBe('900 tokens today')
-    expect(el('session-proj').hidden).toBe(true)
-  })
-
-  test('the Usage arrow follows the tab', () => {
-    api.sent.length = 0
-    el('usage').click()
-    expect(api.sent.find((s) => s.name === 'openUsage').args).toEqual(['codex'])
-  })
-
-  test('the chip leads to Settings instead of the Claude account menu', () => {
-    el('account-chip').click()
-    expect(document.body.classList.contains('settings-open')).toBe(true)
-    expect(el('acc-menu').hidden).toBe(true)
-    el('gear').click()
-  })
-
-  test('an active Codex puts the pet to work', () => {
-    api.handlers.onCodex(codex({ active: true }))
-    expect(el('status-text').textContent).toBe('working')
-    expect(el('tab-codex').classList.contains('active')).toBe(true)
-  })
-
-  test('a long-idle Codex sleeps; no data never does', () => {
-    api.handlers.onCodex(codex({ lastSeen: Date.now() - 3600_000 }))
-    expect(el('status-text').textContent).toBe('sleeping')
-    api.handlers.onCodex(codex({ lastSeen: null }))
-    expect(el('status-text').textContent).toBe('idle')
-  })
-
-  test('unknown and stale windows read as such, never as 0%', () => {
-    api.handlers.onCodex(codex({ session: null, weekly: null }))
-    expect(el('session-pct').textContent).toBe('—')
-    expect(el('session-sub').textContent).toContain('limits not recorded yet')
-    api.handlers.onCodex(
-      codex({ session: { pct: null, expired: true }, limitsAt: Date.now() - 3600_000 }),
-    )
-    expect(el('session-sub').textContent).toContain('waiting for a fresh reading')
-    expect(el('week-sub').textContent).toMatch(/read 1h 0m ago$/)
-    expect(el('mini-reset').hidden).toBe(true) // no reset to tell
-    api.handlers.onCodex(codex({ monthTokens: undefined }))
-    expect(el('mini-reset').textContent).toMatch(/^resets /)
-    el('tab-claude').click()
-    expect(el('mini-reset').hidden).toBe(false)
-    el('tab-codex').click()
-    expect(el('month-total').textContent).toBe('—')
-  })
-
-  test('subtle tabs switch directly and support roving keyboard focus', () => {
-    setConfig(true)
-    pet.pickProvider('claude')
-    api.handlers.onCodex(codex())
-    expect(el('tab-claude').tabIndex).toBe(0)
-    expect(el('tab-codex').tabIndex).toBe(-1)
-    el('tab-claude').dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
-    )
-    expect(document.activeElement).toBe(el('tab-codex'))
-    expect(el('tab-codex').getAttribute('aria-selected')).toBe('true')
-    expect(el('tab-claude').tabIndex).toBe(-1)
-    expect(el('service-panel').getAttribute('aria-labelledby')).toBe('tab-codex')
-    expect(el('session-pct').textContent).toBe('72%')
-    el('tab-codex').dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
-    expect(el('session-pct').textContent).toBe('40%')
-    el('tab-claude').dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }))
-    expect(document.activeElement).toBe(el('tab-codex'))
-    el('tab-codex').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
-    expect(document.activeElement).toBe(el('tab-claude'))
-  })
-
-  test('the inactive tab and dock keep weekly alerts visible without stealing focus', () => {
-    pet.pickProvider('claude')
-    api.handlers.onCodex(codex({ weekly: { pct: 90, resetMs: 1000 } }))
-    expect(el('tab-codex-value').textContent).toBe('72%')
-    expect(el('tab-codex').querySelector('.tab-alert').hidden).toBe(false)
-    expect(
-      document.querySelector('.mini-source[data-provider="codex"]').classList.contains('urgent'),
-    ).toBe(true)
-    expect(el('tab-claude').getAttribute('aria-selected')).toBe('true')
-    el('tab-codex').click()
-    expect(el('week-pct').textContent).toBe('90%')
-    api.handlers.onCodex(codex({ session: null, limitsAt: Date.now() - 3600000 }))
-    expect(el('tab-codex-value').textContent).toBe('—')
-    api.handlers.onCodex(codex())
-  })
-
-  test('compact sizing and single-source labels survive a disconnect', () => {
+  test('compact keeps the single-service width', () => {
     el('min').click()
-    expect(api.all.filter((s) => s.name === 'resize').at(-1).args[0]).toBe(240)
+    expect(api.all.filter((s) => s.name === 'resize').at(-1).args[0]).toBe(192)
     el('min').click()
     expect(api.all.filter((s) => s.name === 'resize').at(-1).args[0]).toBe(304)
-    setConfig(false)
-    expect(el('service-panel').getAttribute('role')).toBe('region')
-    expect(el('service-panel').getAttribute('aria-label')).toBe('Claude usage')
-    expect(el('service-panel').hasAttribute('aria-labelledby')).toBe(false)
-    setConfig(true)
-    api.handlers.onCodex(codex())
   })
 
-  test('collapsed with both: a line per service, and a click picks one', () => {
-    api.handlers.onCodex(codex())
-    document.body.classList.add('collapsed')
-    document.querySelector('.mini-source[data-provider="claude"]').click()
-    expect(el('tab-claude').getAttribute('aria-selected')).toBe('true')
-    expect(el('mini-claude-value').textContent).toBe('40%')
-    document.body.classList.remove('collapsed')
+  test('the chip opens the Claude account menu, not Settings', () => {
+    api.handlers.onProfile({ email: 'me@example.com', plan: 'max' })
+    el('account-chip').click()
+    expect(document.body.classList.contains('settings-open')).toBe(false)
+    expect(el('acc-menu').hidden).toBe(false)
+    el('account-chip').click()
+    api.handlers.onProfile(null)
   })
 
-  test('collapsed at rest, the hottest session sets the mood, whatever the tab', () => {
+  test('collapsed at rest, a hot session sets the mood with the Claude logo', () => {
     document.body.classList.add('collapsed')
-    el('tab-claude').click()
-    api.handlers.onCodex(codex({ session: { pct: 99, resetMs: 3600000 } }))
+    claudeLive(99)
+    pet.render(usage())
     expect(el('mini-text').textContent).toBe('on fire')
     // the service on fire shows its logo instead of the dot
     expect(el('mini-dot').hidden).toBe(true)
     expect(el('mini-workers').hidden).toBe(false)
-    expect(el('mini-workers').getAttribute('aria-label')).toBe('Codex · on fire')
-    expect(el('mini-workers').querySelector('[data-provider="claude"]').hidden).toBe(true)
-    api.handlers.onCodex(codex({ session: { pct: 100, resetMs: 3600000 } }))
+    expect(el('mini-workers').getAttribute('aria-label')).toBe('Claude · on fire')
+    claudeLive(100)
+    pet.render(usage())
     expect(el('mini-text').textContent).toBe('maxed out')
-    expect(el('mini-workers').getAttribute('aria-label')).toBe('Codex · maxed out')
-    api.handlers.onCodex(
-      codex({ active: true, lastSeen: Date.now(), session: { pct: 99, resetMs: 3600000 } }),
-    )
-    expect(el('mini-text').textContent).toBe('working')
-    api.handlers.onCodex(codex({ session: { pct: null, expired: true } }))
+    expect(el('mini-workers').getAttribute('aria-label')).toBe('Claude · maxed out')
+    claudeLive(40)
+    pet.render(usage())
     expect(el('mini-text').textContent).toBe('idle')
     expect(el('mini-workers').hidden).toBe(true)
     expect(el('mini-dot').hidden).toBe(false)
     document.body.classList.remove('collapsed')
-    api.handlers.onCodex(codex())
-    pet.pickProvider('codex')
   })
 
-  test('with Claude signed out, Codex is the only service', () => {
+  test('Settings: the Claude tile says who is connected and opens its card', () => {
+    api.handlers.onProfile({ email: 'me@example.com', plan: 'max' })
+    el('gear').click()
+    expect(document.querySelectorAll('.conn-tile')).toHaveLength(1)
+    expect(el('conn-claude-state').textContent).toBe('max')
+    expect(el('conn-claude').querySelector('.conn-check').hidden).toBe(false)
+    expect(el('conn-claude').getAttribute('aria-label')).toBe('Claude · connected, max')
+    expect(el('account').classList.contains('open')).toBe(false)
+    el('conn-claude').click()
+    expect(el('conn-claude').getAttribute('aria-expanded')).toBe('true')
+    expect(el('account').classList.contains('open')).toBe(true)
+    el('conn-claude').click()
+    expect(el('account').classList.contains('open')).toBe(false)
+    el('conn-claude').click()
+    el('gear').click() // closing folds the card back
+    expect(el('account').classList.contains('open')).toBe(false)
+    api.handlers.onProfile(null)
+    // connected with no plan known: it just says so
+    el('gear').click()
+    expect(el('conn-claude-state').textContent).toBe('Connected')
+    el('gear').click()
     api.handlers.onAuthState({ connected: false })
-    expect(document.body.classList.contains('dual')).toBe(false)
-    expect(document.body.classList.contains('view-codex')).toBe(true)
-    expect(el('session-pct').textContent).toBe('72%')
+    expect(el('conn-claude-state').textContent).toBe('Connect')
+    expect(el('conn-claude').getAttribute('aria-label')).toBe('Claude · not connected')
     claudeLive()
   })
 
-  test('Settings: connect turns Codex on when a session is found', () => {
-    setConfig(false)
-    api.sent.length = 0
-    el('codex-connect').click()
-    expect(api.sent.map((s) => s.name)).toContain('codexDetect')
-    api.handlers.onCodexDetected({ found: false, plan: null })
-    expect(el('codex-hint').textContent).toContain('No session')
-    expect(el('codex-setup').hidden).toBe(false)
-    expect(api.sent.some((s) => s.name === 'codexEnable')).toBe(false)
-    el('codex-setup-cancel').click()
-    expect(el('codex-setup').hidden).toBe(true)
-    el('codex-connect').click()
-    el('codex-retry').click()
-    api.handlers.onCodexDetected({ found: true, plan: 'plus' })
-    expect(api.sent.find((s) => s.name === 'codexEnable').args).toEqual([true])
-    expect(el('codex-setup').hidden).toBe(true)
-  })
-
-  test('Settings: disconnect stops monitoring', () => {
-    setConfig(true)
-    expect(document.body.classList.contains('codex-on')).toBe(true)
-    api.sent.length = 0
-    el('codex-disconnect').click()
-    expect(api.sent.find((s) => s.name === 'codexEnable').args).toEqual([false])
-    setConfig(false)
-    expect(document.body.classList.contains('view-codex')).toBe(false)
-  })
-})
-
-describe('cursor', () => {
-  const DAY = 86400000
-  const cursor = (over = {}) => ({
-    active: false,
-    activity: null,
-    lastSeen: Date.now() - 3 * 60_000,
-    limitsAt: Date.now(),
-    plan: 'free',
-    session: { pct: 12, resetMs: 17 * DAY },
-    api: { pct: 4, resetMs: 17 * DAY },
-    signedOut: false,
-    ...over,
-  })
-  const all = (over = {}) =>
-    api.handlers.onConfig({ alertThresholds: [80, 95], codex: true, cursor: true, ...over })
-  beforeEach(() => {
-    api.handlers.onAuthState({ connected: true })
-    api.handlers.onRealUsage({
-      session: { pct: 40, resetMs: 3600000 },
-      week: { pct: 20, resetMs: DAY },
-      scoped: [],
-    })
-    pet.render(usage())
-    all()
-    api.handlers.onCodex({
-      lastSeen: Date.now() - 60_000,
-      limitsAt: Date.now(),
-      session: { pct: 30 },
-    })
-    api.handlers.onCursor(cursor())
-    pet.pickProvider('claude')
-  })
-
-  test('three services: three tabs, three dock lines, three glance readings', () => {
-    expect(document.body.classList.contains('trio')).toBe(true)
-    for (const p of ['claude', 'codex', 'cursor']) {
-      expect(el(`tab-${p}`).hidden).toBe(false)
-      expect(document.querySelector(`.mini-source[data-provider="${p}"]`).hidden).toBe(false)
-      expect(el(`glance-${p}`).hidden).toBe(false)
-    }
-    expect(el('tab-cursor-value').textContent).toBe('12%')
-    expect(el('tab-cursor').title).toBe('Cursor month 12% · API 4%')
-    expect(el('mini-cursor-value').textContent).toBe('12%')
-    expect(el('glance-cursor-value').textContent).toBe('12%')
-  })
-
-  test('with Codex off, Claude and Cursor pair up; alone, Cursor has the panel', () => {
-    all({ codex: false })
-    expect(document.body.classList.contains('trio')).toBe(false)
-    expect(document.body.classList.contains('dual')).toBe(true)
-    expect(el('tab-codex').hidden).toBe(true)
-    api.handlers.onAuthState({ connected: false })
-    expect(document.body.classList.contains('dual')).toBe(false)
-    expect(document.body.classList.contains('view-cursor')).toBe(true)
-    expect(el('service-panel').getAttribute('aria-label')).toBe('Cursor usage')
-  })
-
-  test('the Cursor tab: its month, its API pool, no token breakdowns', () => {
-    el('tab-cursor').click()
-    expect(document.body.classList.contains('view-cursor')).toBe(true)
-    expect(el('session-label').textContent).toBe('this month · included')
-    expect(el('week-label').textContent).toBe('API models · this month')
-    expect(el('session-pct').textContent).toBe('12%')
-    expect(el('session-sub').textContent).toMatch(/^resets in 17d 0h \(\w+ \d+\)$/)
-    expect(el('week-pct').textContent).toBe('4%')
-    expect(el('rate').textContent).toBe('agent ran 3m ago')
-    expect(el('ac-email').textContent).toBe('Cursor')
-    expect(el('ac-plan').textContent).toBe('free')
-    expect(el('mini-reset').textContent).toMatch(/^resets \w+ \d+$/)
-    el('tab-claude').click()
-    expect(el('session-label').textContent).toBe('current session')
-  })
-
-  test('arrow keys walk all three tabs', () => {
-    const key = (id, k) =>
-      el(id).dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }))
-    key('tab-claude', 'ArrowRight')
-    key('tab-codex', 'ArrowRight')
-    expect(el('tab-cursor').getAttribute('aria-selected')).toBe('true')
-    key('tab-cursor', 'ArrowRight')
-    expect(el('tab-claude').getAttribute('aria-selected')).toBe('true')
-    key('tab-claude', 'End')
-    expect(el('tab-cursor').getAttribute('aria-selected')).toBe('true')
-    key('tab-cursor', 'Home')
-  })
-
-  test('signed out, stale or expired readings say so, never 0%', () => {
-    el('tab-cursor').click()
-    api.handlers.onCursor(cursor({ session: null, api: null, limitsAt: null, signedOut: true }))
-    expect(el('session-pct').textContent).toBe('—')
-    expect(el('session-sub').textContent).toBe('sign in to the Cursor app')
-    expect(el('week-sub').textContent).toBe('—')
-    api.handlers.onCursor(cursor({ session: null, api: null, limitsAt: null, lastSeen: null }))
-    expect(el('session-sub').textContent).toBe('no reading yet')
-    expect(el('rate').textContent).toBe('no agent runs yet')
-    api.handlers.onCursor(cursor({ limitsAt: Date.now() - 3600_000 }))
-    expect(el('session-sub').textContent).toMatch(/read 1h 0m ago$/)
-    expect(el('tab-cursor').title).toContain('not updated recently')
-    api.handlers.onCursor(cursor({ session: { pct: null, expired: true } }))
-    expect(el('session-sub').textContent).toBe('waiting for a fresh reading')
-    el('tab-claude').click()
-  })
-
-  test('a working Cursor names its scene, in the panel and in compact', () => {
-    api.handlers.onCursor(cursor({ active: true, activity: 'running', lastSeen: Date.now() }))
-    el('tab-cursor').click()
-    expect(el('status-text').textContent).toBe('running')
-    expect(el('rate').textContent).toBe('agent ran just now')
-    pet.setDisplaySize('compact')
-    expect(el('mini-workers').getAttribute('aria-label')).toBe('Cursor · running')
-    expect(document.body.classList.contains('act-running')).toBe(true)
-    pet.setDisplaySize('expanded')
-    el('tab-claude').click()
-  })
-
-  test('compact at rest: a hot Cursor month sets the fire, with its logo', () => {
-    pet.setDisplaySize('compact')
-    api.handlers.onCursor(cursor({ session: { pct: 93, resetMs: 17 * DAY } }))
-    expect(el('mini-text').textContent).toBe('on fire')
-    expect(el('mini-workers').getAttribute('aria-label')).toBe('Cursor · on fire')
-    pet.setDisplaySize('expanded')
-  })
-
-  test('a Cursor reminder names its month, and the chip leads to Settings', () => {
-    el('tab-cursor').click()
-    api.handlers.onCursor(cursor({ session: { pct: 90, resetMs: 17 * DAY } }))
-    expect(el('reminder-toggle').hidden).toBe(false)
-    expect(el('reminder-toggle').title).toBe("Remind me when Cursor's monthly reset is due")
-    api.handlers.onReminders({ claude: null, codex: null, cursor: { at: Date.now() + 17 * DAY } })
-    expect(el('reminder-toggle').title).toMatch(/^Cancel Cursor reminder for \w+ \d+$/)
-    api.sent.length = 0
-    el('reminder-toggle').click()
-    expect(api.sent.at(-1)).toEqual({ name: 'setReminder', args: ['cursor', false] })
-    api.handlers.onReminders(null)
-    api.handlers.onReminderDue({ provider: 'cursor', confirmed: true, isCurrent: true })
-    expect(el('companion-notice').textContent).toBe('Cursor · budget is back!')
-    el('account-chip').click()
+  test('the connect placeholder opens Settings on the Claude card', () => {
+    el('limits-connect').click()
     expect(document.body.classList.contains('settings-open')).toBe(true)
+    expect(el('account').classList.contains('open')).toBe(true)
     el('gear').click()
-    el('tab-claude').click()
-  })
-
-  test('Settings: a tile per service; a click opens its card, one at a time', () => {
-    api.handlers.onProfile({ email: 'me@example.com', plan: 'max' })
-    all({ cursor: false })
-    el('gear').click()
-    expect(el('conn-claude-state').textContent).toBe('max')
-    expect(el('conn-claude').querySelector('.conn-check').hidden).toBe(false)
-    expect(el('conn-cursor-state').textContent).toBe('Connect')
-    expect(el('conn-cursor').querySelector('.conn-check').hidden).toBe(true)
-    expect(el('conn-cursor').getAttribute('aria-label')).toBe('Cursor · not connected')
-    expect(el('cursor-settings').classList.contains('open')).toBe(false)
-    el('conn-cursor').click()
-    expect(el('conn-cursor').getAttribute('aria-expanded')).toBe('true')
-    expect(el('cursor-settings').classList.contains('open')).toBe(true)
-    el('conn-codex').click()
-    expect(el('cursor-settings').classList.contains('open')).toBe(false)
-    expect(el('codex-settings').classList.contains('open')).toBe(true)
-    el('conn-codex').click()
-    expect(el('codex-settings').classList.contains('open')).toBe(false)
-    // connected with no plan known: it just says so
-    all()
-    api.handlers.onCursor(cursor({ plan: null }))
-    expect(el('conn-cursor-state').textContent).toBe('Connected')
-    el('conn-cursor').click()
-    el('gear').click() // closing folds every card back
-    expect(el('cursor-settings').classList.contains('open')).toBe(false)
-    // the Cursor chip opens straight on its card
-    el('tab-cursor').click()
-    el('account-chip').click()
-    expect(el('cursor-settings').classList.contains('open')).toBe(true)
-    el('gear').click()
-    el('tab-claude').click()
-    api.handlers.onProfile(null)
-  })
-
-  test('Settings: connect needs the Cursor app signed in; disconnect stops it', () => {
-    all({ cursor: false })
-    expect(document.body.classList.contains('cursor-on')).toBe(false)
-    api.sent.length = 0
-    el('cursor-connect').click()
-    expect(el('cursor-hint').textContent).toBe('Looking…')
-    expect(api.sent.map((m) => m.name)).toContain('cursorDetect')
-    api.handlers.onCursorDetected({ found: false, plan: null })
-    expect(el('cursor-hint').textContent).toContain('open the Cursor app')
-    expect(el('cursor-setup').hidden).toBe(false)
-    el('cursor-setup-cancel').click()
-    expect(el('cursor-setup').hidden).toBe(true)
-    el('cursor-connect').click()
-    el('cursor-retry').click()
-    api.handlers.onCursorDetected({ found: true, plan: 'free' })
-    expect(api.sent.find((m) => m.name === 'cursorEnable').args).toEqual([true])
-    all()
-    expect(document.body.classList.contains('cursor-on')).toBe(true)
-    api.sent.length = 0
-    el('cursor-disconnect').click()
-    expect(api.sent.find((m) => m.name === 'cursorEnable').args).toEqual([false])
-    all({ cursor: false })
-    expect(el('tab-cursor').hidden).toBe(true)
-    all()
   })
 })
 
@@ -1185,7 +856,7 @@ describe('the voice', () => {
     expect(el('bubble').hidden).toBe(true)
   })
 
-  test('keeps a gap between remarks — unless the moment is a headline', () => {
+  test('keeps a gap between remarks - unless the moment is a headline', () => {
     expect(pet.say('one')).toBe(true)
     tick(60000)
     expect(pet.say('two')).toBe(false)
@@ -1216,7 +887,7 @@ describe('the voice', () => {
     expect(pet.soundOn()).toBe(false)
   })
 
-  test('collapsed, the bubble moves above the pet — and back when expanded', () => {
+  test('collapsed, the bubble moves above the pet - and back when expanded', () => {
     document.body.classList.add('collapsed')
     expect(pet.say({ text: 'a whole sentence', short: 'up here' })).toBe(true)
     expect(bubble()).toBe('up here') // the mini face gets the glance
@@ -1321,44 +992,6 @@ describe('the voice', () => {
     expect(bubble()).toBeNull()
   })
 
-  test('Codex speaks for itself: fire, ceiling and a fresh window', () => {
-    const cx = (pct) =>
-      api.handlers.onCodex({
-        session: { pct, resetMs: 3600_000 },
-        weekly: { pct: 1 },
-        limitsAt: clock,
-      })
-    api.handlers.onConfig({ mode: 'floating', alertThresholds: [80, 95], codex: true })
-    cx(40)
-    cx(92)
-    expect(bubble()).toBe('Codex is at 92% now. It resets in 1h 0m.')
-    tick(11 * 60000)
-    cx(100)
-    expect(bubble()).toContain('Codex is maxed out')
-    cx(3)
-    expect(bubble()).toBe('Codex has a fresh window! The last one closed at 100%.')
-    api.handlers.onConfig({ mode: 'floating', alertThresholds: [80, 95], codex: false })
-  })
-
-  test('Cursor speaks for itself too, about its month', () => {
-    const cu = (pct) =>
-      api.handlers.onCursor({
-        session: { pct, resetMs: 3600_000 },
-        api: { pct: 1 },
-        limitsAt: clock,
-      })
-    api.handlers.onConfig({ mode: 'floating', alertThresholds: [80, 95], cursor: true })
-    cu(40)
-    cu(92)
-    expect(bubble()).toBe('Cursor is at 92% now. It resets in 1h 0m.')
-    tick(11 * 60000)
-    cu(100)
-    expect(bubble()).toContain('Cursor is maxed out')
-    cu(3)
-    expect(bubble()).toBe('Cursor has a fresh month! The last one closed at 100%.')
-    api.handlers.onConfig({ mode: 'floating', alertThresholds: [80, 95], cursor: false })
-  })
-
   test('the simulator can make it talk', () => {
     api.handlers.onDebugState({ state: 'say' })
     expect(bubble()).toMatch(/yesterday/i)
@@ -1372,8 +1005,6 @@ describe('the voice', () => {
     ['streak', 'Stretch break?'],
     ['record', 'New record!'],
     ['greeting', 'yesterday'],
-    ['codex', 'Codex is at 91%'],
-    ['cursor', 'Cursor is at 91%'],
   ])('the simulator previews the %s remark', (kind, text) => {
     api.handlers.onDebugState({ state: 'say', kind })
     expect(bubble()?.toLowerCase()).toContain(text.toLowerCase())
@@ -1407,21 +1038,11 @@ describe('the voice', () => {
 })
 
 describe('pet-only companion and reset controls', () => {
-  const cx = (extra = {}) => ({
-    active: false,
-    lastSeen: Date.now(),
-    limitsAt: Date.now(),
-    session: { pct: 95, resetMs: 3600000 },
-    weekly: { pct: 10 },
-    ...extra,
-  })
   beforeEach(() => {
     document.body.classList.remove('settings-open')
-    api.handlers.onConfig({ mode: 'floating', codex: true, zoom: 100, talk: false })
-    api.handlers.onReminders({ claude: null, codex: null })
-    api.handlers.onCodex(cx())
+    api.handlers.onConfig({ mode: 'floating', zoom: 100, talk: false })
+    api.handlers.onReminders({ claude: null })
     pet.render(usage({ active: false }))
-    pet.pickProvider('claude')
     pet.setDisplaySize('expanded')
     live(90)
   })
@@ -1474,93 +1095,134 @@ describe('pet-only companion and reset controls', () => {
       pet.setDisplaySize('expanded')
     }
   })
-  test('glance readings support one provider and never invent missing usage', () => {
-    api.handlers.onCodex(cx({ session: null }))
-    expect(el('glance-codex-value').textContent).toBe('—')
+  test('the glance reads Claude and never invents missing usage', () => {
+    expect(el('glance-claude').hidden).toBe(false)
+    expect(el('glance-claude-value').textContent).toBe('90%')
+    expect(el('glance-claude').classList.contains('urgent')).toBe(true)
+    expect(el('glance-empty').hidden).toBe(true)
+    api.handlers.onRealUsage(null)
+    expect(el('glance-claude-value').textContent).toBe('-') // the empty-reading dash
     api.handlers.onAuthState({ connected: false })
     expect(el('glance-claude').hidden).toBe(true)
-    expect(el('glance-codex').hidden).toBe(false)
+    expect(el('glance-empty').hidden).toBe(false)
     pet.setDisplaySize('pet')
-    api.handlers.onConfig({ mode: 'menubar', codex: true })
+    api.handlers.onConfig({ mode: 'menubar' })
     expect(document.body.classList.contains('pet-only')).toBe(false)
     expect(document.body.classList.contains('collapsed')).toBe(true)
     pet.setDisplaySize('expanded')
   })
-  test('reminders toggle the selected provider, remain cancelable on stale data', () => {
+  test('reminders toggle for Claude, and remain cancelable on stale data', () => {
     expect(el('reminder-toggle').hidden).toBe(false)
+    expect(el('reminder-toggle').title).toBe("Remind me when Claude's session reset is due")
     el('reminder-toggle').click()
     expect(api.sent.at(-1)).toEqual({ name: 'setReminder', args: ['claude', true] })
-    api.handlers.onReminders({ claude: { at: Date.now() + 1000 }, codex: null })
+    api.handlers.onReminders({ claude: { at: Date.now() + 1000 } })
     expect(el('mini-reminder').getAttribute('aria-pressed')).toBe('true')
+    expect(el('reminder-toggle').title).toMatch(/^Cancel Claude reminder for /)
     el('mini-reminder').click()
     expect(api.sent.at(-1).args).toEqual(['claude', false])
-    pet.pickProvider('codex')
-    api.handlers.onCodex(cx({ limitsAt: Date.now() - 3600000 }))
-    expect(el('reminder-toggle').hidden).toBe(true)
-    api.handlers.onReminders({ codex: { at: Date.now() + 1000 }, claude: null })
-    expect(el('reminder-toggle').hidden).toBe(false)
-    el('reminder-toggle').click()
-    expect(api.sent.at(-1).args).toEqual(['codex', false])
-  })
-  test('background activity reacts without stealing the selected provider', () => {
-    pet.activityTracker.forget('codex')
-    api.handlers.onCodex(cx({ active: false }))
-    pet.pickProvider('claude')
-    api.handlers.onCodex(cx({ active: true }))
-    expect(el('tab-claude').getAttribute('aria-selected')).toBe('true')
-    // Cooldown may suppress a cue from a previous test, but never selection.
-    expect(el('glance-codex-value').textContent).toBe('95%')
+    // a reset a day or more out names its date
+    api.handlers.onReminders({ claude: { at: Date.now() + 3 * 86400000 } })
+    expect(el('reminder-toggle').title).toMatch(/^Cancel Claude reminder for \w+ \d+$/)
+    // stale: no new reminder is offered, but an armed one can still be canceled
+    const realNow = Date.now
+    Date.now = () => realNow() + 16 * 60000
+    try {
+      api.handlers.onReminders(null)
+      expect(el('reminder-toggle').hidden).toBe(true)
+      api.handlers.onReminders({ claude: { at: realNow() + 3600000 } })
+      expect(el('reminder-toggle').hidden).toBe(false)
+    } finally {
+      Date.now = realNow
+    }
+    api.handlers.onReminders({ claude: null, error: 'Wait for a fresh usage reading.' })
+    expect(el('companion-notice').textContent).toBe('Wait for a fresh usage reading.')
   })
   for (const size of ['compact', 'pet']) {
-    test(`${size}: workers drive the pet without changing the selected usage`, () => {
+    test(`${size}: Claude's activity drives the pet`, () => {
       live(100)
       pet.setDisplaySize(size)
-      api.handlers.onCodex(cx({ active: true }))
-      expect(document.body.classList.contains('state-working')).toBe(true)
-      expect(el('mini-workers').getAttribute('aria-label')).toBe('Codex · working')
-      expect(el('tab-claude').getAttribute('aria-selected')).toBe('true')
-      expect(el('session-pct').textContent).toBe('100%')
       const bounds = api.all.filter((s) => s.name === 'resize').at(-1).args
-      pet.render(usage({ active: true, activity: 'reading' }))
-      expect(el('pet-activity').getAttribute('aria-label')).toBe('Claude + Codex · working')
-      expect(document.body.classList.contains('act-reading')).toBe(false)
-      pet.pickProvider('codex')
-      expect(el('mini-text').textContent).toBe('working')
-      expect(api.all.filter((s) => s.name === 'resize').at(-1).args).toEqual(bounds)
-      api.handlers.onCodex(cx({ active: false }))
+      pet.render(usage({ active: true, activity: 'reading', ts: Date.now() }))
+      expect(document.body.classList.contains('state-working')).toBe(true)
       expect(el('mini-workers').getAttribute('aria-label')).toBe('Claude · reading')
+      expect(el('pet-activity').getAttribute('aria-label')).toBe('Claude · reading')
       expect(document.body.classList.contains('act-reading')).toBe(true)
+      expect(el('session-pct').textContent).toBe('100%')
+      expect(api.all.filter((s) => s.name === 'resize').at(-1).args).toEqual(bounds)
       pet.render(usage({ active: false }))
       // at rest, Claude's maxed session still shows, logo and all
       expect(el('mini-workers').getAttribute('aria-label')).toBe('Claude · maxed out')
       expect(el('pet-activity').getAttribute('aria-label')).toBe('Claude · maxed out')
       expect(document.body.classList.contains('state-tired')).toBe(true)
-      expect(el('tab-codex').getAttribute('aria-selected')).toBe('true')
       pet.setDisplaySize('expanded')
-      expect(document.body.classList.contains('state-stressed')).toBe(true)
+      expect(document.body.classList.contains('state-tired')).toBe(true)
     })
   }
   test('compact workers clear on disconnect, account switch and stale snapshots', () => {
     pet.setDisplaySize('compact')
-    live(40) // cool sessions: only workers put logos up here
+    live(40) // a cool session: only work puts the logo up here
     pet.render(usage({ active: true, activity: 'editing' }))
-    api.handlers.onCodex(cx({ active: true, lastSeen: Date.now() - 120000, session: { pct: 10 } }))
     expect(el('mini-workers').getAttribute('aria-label')).toBe('Claude · editing')
     api.handlers.onAccounts({ active: 'different', accounts: [] })
     expect(el('mini-workers').hidden).toBe(true)
-    api.handlers.onCodex(cx({ active: true, session: { pct: 10 } }))
-    expect(el('mini-workers').hidden).toBe(false)
-    api.handlers.onConfig({ mode: 'floating', codex: false, talk: false })
+    pet.render(usage({ active: true, activity: 'editing', ts: Date.now() - 120000 }))
     expect(el('mini-workers').hidden).toBe(true)
     pet.render(usage({ active: true }))
+    expect(el('mini-workers').hidden).toBe(false)
     api.handlers.onAuthState({ connected: false })
     expect(el('mini-workers').hidden).toBe(true)
     pet.setDisplaySize('expanded')
   })
   test('scheduled and verified resets use distinct messages', () => {
-    api.handlers.onReminderDue({ provider: 'codex', confirmed: false, isCurrent: true })
-    expect(el('companion-notice').textContent).toBe('Codex · reset time reached')
+    api.handlers.onReminderDue({ provider: 'claude', confirmed: false, isCurrent: true })
+    expect(el('companion-notice').textContent).toBe('Claude · reset time reached')
     api.handlers.onReminderDue({ provider: 'claude', confirmed: true, isCurrent: true })
     expect(el('companion-notice').textContent).toBe('Claude · budget is back!')
+    el('companion-notice').textContent = ''
+    api.handlers.onReminderDue({ provider: 'claude', confirmed: true, isCurrent: false })
+    expect(el('companion-notice').textContent).toBe('')
+  })
+})
+
+// Regression: in the menu-bar popover, a double-click on the pet made it
+// compact and nothing could expand it again: the expand button was hidden and
+// the collapsed pet was a drag region, which swallows every pointer event (so
+// the second double-click never reached the page).
+describe('menu-bar popover can always expand back', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'renderer', 'style.css'), 'utf8')
+  const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(
+    ([, sel, body]) => ({ sel: sel.trim(), body }),
+  )
+  // does a selector list apply to the given body classes? (enough for the
+  // `body.a:not(.b) #id` shapes used here)
+  const applies = (sel, classes, id) =>
+    sel.split(',').some((one) => {
+      const parts = one.trim().split(/\s+/)
+      const [bodyPart, target] = parts
+      if (parts.length !== 2 || target !== id || !bodyPart.startsWith('body')) return false
+      const need = [...bodyPart.matchAll(/(?<!:not\()\.([\w-]+)/g)].map((m) => m[1])
+      const not = [...bodyPart.matchAll(/:not\(\.([\w-]+)\)/g)].map((m) => m[1])
+      return need.every((c) => classes.includes(c)) && not.every((c) => !classes.includes(c))
+    })
+  const hides = (classes, id) =>
+    rules.some((r) => applies(r.sel, classes, id) && /display:\s*none/.test(r.body))
+  const drags = (classes, id) =>
+    rules.some((r) => applies(r.sel, classes, id) && /app-region:\s*drag/.test(r.body))
+
+  test('the expand button shows once the popover is compact', () => {
+    expect(hides(['is-menubar'], '#min')).toBe(true) // expanded: the popover auto-sizes
+    expect(hides(['is-menubar', 'collapsed'], '#min')).toBe(false)
+  })
+  test('the compact pet stays clickable in the popover, draggable when floating', () => {
+    expect(drags(['is-menubar', 'collapsed'], '#pet')).toBe(false)
+    expect(drags(['collapsed'], '#pet')).toBe(true)
+  })
+  test('a double-click expands the compact popover again', () => {
+    api.handlers.onConfig({ mode: 'menubar' })
+    pet.setDisplaySize('compact')
+    el('pet').dispatchEvent(new MouseEvent('dblclick'))
+    expect(document.body.classList.contains('collapsed')).toBe(false)
+    api.handlers.onConfig({ mode: 'floating' })
   })
 })

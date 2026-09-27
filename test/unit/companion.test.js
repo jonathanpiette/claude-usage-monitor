@@ -24,7 +24,7 @@ describe('one-shot reset reminders', () => {
   }
   const reminder = (key, at) => ({
     key,
-    provider: key === 'codex' ? 'codex' : 'claude',
+    provider: 'claude',
     label: key,
     at,
     pct: 95,
@@ -33,7 +33,7 @@ describe('one-shot reset reminders', () => {
     const s = setup()
     s.store.arm(reminder('claude:a', s.now() + 1000))
     s.store.arm(reminder('claude:b', s.now() + 5000))
-    s.store.arm(reminder('codex', s.now() + 5000))
+    s.store.arm(reminder('claude:c', s.now() + 5000))
     expect(s.store.takeDue()).toEqual([])
     s.advance(3000)
     const reboot = s.restart()
@@ -44,7 +44,7 @@ describe('one-shot reset reminders', () => {
         .restart()
         .list()
         .map((r) => r.key),
-    ).toEqual(['claude:b', 'codex'])
+    ).toEqual(['claude:b', 'claude:c'])
     expect(reboot.recentlyDelivered('claude:a')).toBe(true)
     expect(reboot.recentlyDelivered('claude:b')).toBe(false)
     s.advance(3600001)
@@ -52,11 +52,11 @@ describe('one-shot reset reminders', () => {
   })
   test('rearming replaces only that account; cancellation survives restart', () => {
     const s = setup()
-    s.store.arm(reminder('codex', s.now() + 1000))
-    s.store.arm(reminder('codex', s.now() + 2000))
+    s.store.arm(reminder('claude:a', s.now() + 1000))
+    s.store.arm(reminder('claude:a', s.now() + 2000))
     s.store.cancel('missing')
     expect(s.store.list()).toHaveLength(1)
-    s.store.cancel('codex')
+    s.store.cancel('claude:a')
     s.advance(3000)
     expect(s.restart().takeDue()).toEqual([])
   })
@@ -64,10 +64,20 @@ describe('one-shot reset reminders', () => {
     const s = setup({ pending: [null, { at: 'tomorrow' }], delivered: { bad: 'oops' } })
     expect(s.store.list()).toEqual([])
     for (const at of [NaN, Infinity, s.now(), s.now() + 33 * 86400000]) {
-      expect(s.store.arm(reminder('codex', at))).toBe(false)
+      expect(s.store.arm(reminder('claude:a', at))).toBe(false)
     }
-    // a monthly Cursor reset is within reach
-    expect(s.store.arm(reminder('cursor', s.now() + 20 * 86400000))).toBe(true)
+    // anything within the 32-day horizon is within reach
+    expect(s.store.arm(reminder('claude:a', s.now() + 20 * 86400000))).toBe(true)
+    // only Claude reminders are valid now: leftovers from removed providers are dropped
+    expect(s.store.arm({ ...reminder('codex', s.now() + 1000), provider: 'codex' })).toBe(false)
+    expect(s.store.arm({ ...reminder('cursor', s.now() + 1000), provider: 'cursor' })).toBe(false)
+    const legacy = setup({
+      pending: [
+        { ...reminder('codex', s.now() + 1000), provider: 'codex' },
+        reminder('claude:a', s.now() + 1000),
+      ],
+    })
+    expect(legacy.store.list().map((r) => r.key)).toEqual(['claude:a'])
     const broken = createReminders({
       load: () => {
         throw new Error('bad JSON')
@@ -87,10 +97,10 @@ describe('one-shot reset reminders', () => {
       },
     })
     fail = true
-    expect(() => s.arm(reminder('codex', 100))).toThrow('disk full')
+    expect(() => s.arm(reminder('claude:a', 100))).toThrow('disk full')
     expect(s.list()).toEqual([])
     fail = false
-    s.arm(reminder('codex', 100))
+    s.arm(reminder('claude:a', 100))
     fail = true
     clock = 101
     expect(() => s.takeDue()).toThrow('disk full')
@@ -100,73 +110,52 @@ describe('one-shot reset reminders', () => {
   })
 })
 
-describe('provider reactions', () => {
-  test('baselines, simultaneous activity, cooldown and disconnects', () => {
+describe('activity reactions', () => {
+  test('baselines, cooldown and disconnects', () => {
     let now = 0
     const t = createActivityTracker({ now: () => now, cooldown: 30 })
-    expect(t.observe('claude', { active: true, activity: 'reading' })).toBeNull()
-    expect(t.observe('codex', { active: false })).toBeNull()
-    expect(t.observe('codex', { active: true })).toEqual({
-      provider: 'codex',
+    expect(t.observe('claude', { active: false })).toBeNull()
+    expect(t.observe('claude', { active: true })).toEqual({
+      provider: 'claude',
       activity: 'working',
     })
+    // within the cooldown a change is noted but not cued
     expect(t.observe('claude', { active: true, activity: 'editing' })).toBeNull()
     now = 31
     expect(t.observe('claude', { active: true, activity: 'editing' })).toBeNull()
-    expect(t.observe('codex', { active: false })).toEqual({
-      provider: 'codex',
+    expect(t.observe('claude', { active: false })).toEqual({
+      provider: 'claude',
       activity: 'paused',
     })
-    t.forget('codex')
+    t.forget('claude')
     now = 100
-    expect(t.observe('codex', { active: true })).toBeNull()
+    expect(t.observe('claude', { active: true })).toBeNull()
     expect(t.observe('claude', null)).toBeNull()
     expect(t.observe('claude', { active: true })).toBeNull()
   })
 })
 
 describe('current workers', () => {
-  test('uses activity timestamps independently of old quota readings', () => {
+  test('uses the activity timestamp, and names the scene', () => {
     const now = 1_000_000
     const claude = { active: true, ts: now, activity: 'editing' }
-    const codex = { active: true, lastSeen: now, limitsAt: 1 }
-    expect(currentActivity({ claude }, now).activity).toBe('editing')
-    expect(currentActivity({ claude, codex }, now)).toMatchObject({
-      providers: ['claude', 'codex'],
+    expect(currentActivity({ claude }, now)).toMatchObject({
+      providers: ['claude'],
+      activity: 'editing',
+    })
+    expect(currentActivity({ claude }, now + 60001)).toMatchObject({
+      providers: [],
       activity: 'working',
     })
-    expect(currentActivity({ claude, codex }, now + 60001).providers).toEqual([])
-    expect(
-      currentActivity({ claude: { active: true }, codex: { active: true } }, now).providers,
-    ).toEqual([])
-    expect(currentActivity({ codex }, now).providers).toEqual(['codex'])
+    expect(currentActivity({ claude: { active: true } }, now).providers).toEqual([])
     expect(currentActivity({ claude: { active: true, ts: now } }, now).activity).toBe('working')
+    expect(currentActivity({}, now).providers).toEqual([])
+    expect(currentActivity(undefined, now).providers).toEqual([])
   })
-  test('sleeps only when connected sources have evidence of rest', () => {
+  test('sleeps only when Claude is connected and resting', () => {
     const now = 1_000_000
     expect(currentActivity({}, now).sleeping).toBe(false)
-    const claude = { sleeping: true }
-    expect(currentActivity({ claude, codex: { lastSeen: null } }, now).sleeping).toBe(false)
-    expect(currentActivity({ claude, codex: { lastSeen: 1 } }, now).sleeping).toBe(true)
+    expect(currentActivity({ claude: { sleeping: true } }, now).sleeping).toBe(true)
     expect(currentActivity({ claude: { sleeping: false } }, now).sleeping).toBe(false)
-    // Cursor rests like Codex: only on an old transcript
-    expect(currentActivity({ claude, cursor: { lastSeen: now } }, now).sleeping).toBe(false)
-    expect(currentActivity({ claude, cursor: { lastSeen: 1 } }, now).sleeping).toBe(true)
-  })
-  test('Cursor works like Claude: alone it names its scene, with others it shares one', () => {
-    const now = 1_000_000
-    const cursor = { active: true, lastSeen: now, activity: 'running' }
-    expect(currentActivity({ cursor }, now)).toMatchObject({
-      providers: ['cursor'],
-      activity: 'running',
-    })
-    const claude = { active: true, ts: now, activity: 'editing' }
-    expect(currentActivity({ claude, cursor }, now)).toMatchObject({
-      providers: ['claude', 'cursor'],
-      activity: 'working',
-    })
-    expect(
-      currentActivity({ cursor: { ...cursor, lastSeen: now - 60001 } }, now).providers,
-    ).toEqual([])
   })
 })

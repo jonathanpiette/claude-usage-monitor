@@ -1,6 +1,6 @@
 # Contributing to Clauddy
 
-Thanks for helping out. This is short on purpose — it only covers the things
+Thanks for helping out. This is short on purpose - it only covers the things
 that will actually trip you up.
 
 ## Setup
@@ -10,7 +10,7 @@ bun install     # also wires up the pre-commit hook
 bun start       # run the widget from source
 ```
 
-Node 24 (pinned in `.nvmrc`). No other setup — the app reads your existing
+Node 24 (pinned in `.nvmrc`). No other setup - the app reads your existing
 `~/.claude` logs, and login is optional (without it you get token counts but no
 percentages).
 
@@ -18,7 +18,7 @@ percentages).
 
 **1. `bun run test`, never bare `bun test`.** The suite runs as three separate
 processes, because bun mocks are per-runtime and it loads every test file before
-running any — so `main`'s fake `electron` would reach the suites testing the
+running any - so `main`'s fake `electron` would reach the suites testing the
 real modules. Bare `bun test` runs all of them together and reports dozens of
 failures that have nothing to do with your change.
 
@@ -57,18 +57,18 @@ bun run pack           # confirm the app still builds and launches
 
 ## Landmines
 
-- **`main.js`'s update path spawns `curl … | bash`.** Any test that reaches
-  `do-update` must stub `child_process.spawn`, or it downloads the installer
-  and replaces the app you're running.
+- **The app must never spawn a shell.** `do-update` only opens the releases
+  page; the main-process tests keep `child_process.spawn` stubbed as a
+  tripwire and assert it is never called.
 - **Never commit `auth.json`.** It holds an OAuth token. It lives in
-  `~/.claude-usage-monitor/` and is gitignored — keep it that way, and don't
+  `~/.claude-usage-monitor/` and is gitignored - keep it that way, and don't
   paste tokens into issues.
 - **Windows and Linux artifacts can't be cross-built from macOS.** The release
   workflow builds each on its own runner; don't try to reproduce that locally.
 
 ## Playing with the pet
 
-`./pet <state>` forces a state without waiting for real usage — handy for
+`./pet <state>` forces a state without waiting for real usage - handy for
 anything visual:
 
 ```bash

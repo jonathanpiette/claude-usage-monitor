@@ -33,17 +33,7 @@ const STATES = [
   'waiting',
 ]
 // `clauddy say <kind>` previews one of the pet's remarks
-const REMARKS = [
-  'greeting',
-  'fire',
-  'reset',
-  'maxed',
-  'welcome',
-  'streak',
-  'record',
-  'codex',
-  'cursor',
-]
+const REMARKS = ['greeting', 'fire', 'reset', 'maxed', 'welcome', 'streak', 'record']
 const arg = process.argv[2]
 const kind = arg === 'say' ? process.argv[3] || 'greeting' : undefined
 
@@ -56,7 +46,7 @@ if (!arg) {
 } else if (arg === '--help' || arg === '-h') {
   console.log(
     [
-      'clauddy — a cute desktop pet that tracks your Claude Code usage',
+      'clauddy - a cute desktop pet that tracks your Claude Code usage',
       '',
       'Usage:',
       '  clauddy            launch the widget',
@@ -82,6 +72,6 @@ if (!arg) {
   console.log(`clauddy → ${arg}${kind ? ` ${kind}` : ''} (the running widget will react)`)
 } else {
   console.error(`clauddy: unknown command "${arg}"`)
-  console.error('try: fire, sleeping, working, tired, idle, poke, celebrate, auto — or --help')
+  console.error('try: fire, sleeping, working, tired, idle, poke, celebrate, auto - or --help')
   process.exit(1)
 }
