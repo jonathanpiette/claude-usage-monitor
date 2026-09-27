@@ -1184,3 +1184,45 @@ describe('pet-only companion and reset controls', () => {
     expect(el('companion-notice').textContent).toBe('')
   })
 })
+
+// Regression: in the menu-bar popover, a double-click on the pet made it
+// compact and nothing could expand it again: the expand button was hidden and
+// the collapsed pet was a drag region, which swallows every pointer event (so
+// the second double-click never reached the page).
+describe('menu-bar popover can always expand back', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'renderer', 'style.css'), 'utf8')
+  const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(
+    ([, sel, body]) => ({ sel: sel.trim(), body }),
+  )
+  // does a selector list apply to the given body classes? (enough for the
+  // `body.a:not(.b) #id` shapes used here)
+  const applies = (sel, classes, id) =>
+    sel.split(',').some((one) => {
+      const parts = one.trim().split(/\s+/)
+      const [bodyPart, target] = parts
+      if (parts.length !== 2 || target !== id || !bodyPart.startsWith('body')) return false
+      const need = [...bodyPart.matchAll(/(?<!:not\()\.([\w-]+)/g)].map((m) => m[1])
+      const not = [...bodyPart.matchAll(/:not\(\.([\w-]+)\)/g)].map((m) => m[1])
+      return need.every((c) => classes.includes(c)) && not.every((c) => !classes.includes(c))
+    })
+  const hides = (classes, id) =>
+    rules.some((r) => applies(r.sel, classes, id) && /display:\s*none/.test(r.body))
+  const drags = (classes, id) =>
+    rules.some((r) => applies(r.sel, classes, id) && /app-region:\s*drag/.test(r.body))
+
+  test('the expand button shows once the popover is compact', () => {
+    expect(hides(['is-menubar'], '#min')).toBe(true) // expanded: the popover auto-sizes
+    expect(hides(['is-menubar', 'collapsed'], '#min')).toBe(false)
+  })
+  test('the compact pet stays clickable in the popover, draggable when floating', () => {
+    expect(drags(['is-menubar', 'collapsed'], '#pet')).toBe(false)
+    expect(drags(['collapsed'], '#pet')).toBe(true)
+  })
+  test('a double-click expands the compact popover again', () => {
+    api.handlers.onConfig({ mode: 'menubar' })
+    pet.setDisplaySize('compact')
+    el('pet').dispatchEvent(new MouseEvent('dblclick'))
+    expect(document.body.classList.contains('collapsed')).toBe(false)
+    api.handlers.onConfig({ mode: 'floating' })
+  })
+})

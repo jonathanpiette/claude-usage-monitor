@@ -560,8 +560,10 @@ input[type="number"]::-webkit-outer-spin-button {
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
   color: #eadccf;
 }
-/* menu-bar mode: the popover auto-sizes, so the minimize control is redundant */
-body.is-menubar #min {
+/* menu-bar mode: the popover auto-sizes, so minimizing it from the button is
+   redundant. Once compact (double-click on the pet), the button stays as the
+   way back to the full view. */
+body.is-menubar:not(.collapsed) #min {
   display: none;
 }
 /* settings rows: label on the left, control on the right - one setting per
@@ -1258,8 +1260,10 @@ body.collapsed:not(.pet-only) #mini-acct-name {
 body.collapsed #stage {
   margin-top: 9px;
 }
-/* collapsed: drag the widget by the pet */
-body.collapsed #pet {
+/* collapsed: drag the widget by the pet. Not in the menu-bar popover, which
+   does not move: a drag region swallows every pointer event, and the pet's
+   double-click must still reach the page to expand it again. */
+body.collapsed:not(.is-menubar) #pet {
   -webkit-app-region: drag;
 }
 /* hide minimize while settings are open (toggling it bugs the layout) */
